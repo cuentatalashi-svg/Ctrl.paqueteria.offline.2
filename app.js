@@ -18,11 +18,9 @@
   // --- INICIO SETUP DE jspdf ---
   let jsPDF;
   // ★★★ CORRECCIÓN AQUÍ: Acceso más robusto a la clase jsPDF del CDN umd ★★★
-  // La librería UMD suele exponer la clase constructora bajo 'jspdf.jsPDF'
   if(window.jspdf && window.jspdf.jsPDF) {
     jsPDF = window.jspdf.jsPDF;
   } else if (typeof window.jsPDF === 'function') {
-    // Caso de otros CDN o versiones más antiguas
     jsPDF = window.jsPDF;
   }
   // --- FIN SETUP ---
@@ -574,8 +572,8 @@
       }
     });
 
-    // --- RECIBIR PAQUETE (FIX: Notificación se ejecuta SOLO AQUÍ y una vez) ---
-    recibirBtn.addEventListener('click', async ()=>{
+    // ★★★ INICIO NUEVA FUNCIÓN CON NOMBRE PARA EVITAR DUPLICACIÓN DEL LISTENER ★★★
+    async function handleRecibirPaquete(){
       clearMessage();
       const guia = guiaEl.value.trim();
       const nombre = nombreDest.value.trim();
@@ -595,7 +593,7 @@
         if (!p) { await addItem('historial',{paqueteId:id,estado:'en_caseta',usuario:user.nombre,fecha:Date.now(),nota:''}); }
         let notified = false;
         
-        // ★★★ INICIO LÓGICA DE NOTIFICACIÓN (Solo si está marcado) ★★★
+        // LÓGICA DE NOTIFICACIÓN (Solo si está marcado)
         if (notificarSi.checked) {
           const dom = domicilioInput.value.trim(); let domInfo = null;
           if (dom) { const doms = await getAll('domicilios'); domInfo = doms.find(d => d.calle === dom); }
@@ -605,7 +603,6 @@
           const comentariosMsg = comentarios ? `\nComentarios: ${comentarios}` : '';
           const msg = `📦 *PAQUETE EN CASETA* 📦\nHola ${nombreRes}, se ha recibido 1 paquete para su domicilio.\n\n${domInfoMsg}\n${paqInfo}${comentariosMsg}\n\nRecibido por: ${user.nombre}.`;
 
-          // --- Corregido Web Share API (v7 - Quitar Title) ---
           const fotoFile = dataURLtoFile(fotoDataURL, `paquete_${guia}.png`);
           const bannerDataURL = await createBannerImage('✅ Paquete en Caseta ✅');
           const bannerFile = dataURLtoFile(bannerDataURL, 'notificacion.png');
@@ -632,6 +629,7 @@
 
           if (canShareFiles) {
             try { 
+              // *** ÚNICA LLAMADA A navigator.share() ***
               await navigator.share(shareDataWithFiles); 
               notified = true; 
             } 
@@ -650,6 +648,7 @@
           else if (navigator.canShare && navigator.canShare(shareDataTextOnly)) {
              console.warn("No se pueden compartir archivos, compartiendo solo texto.");
              try {
+                // *** ÚNICA LLAMADA A navigator.share() (Texto) ***
                 await navigator.share(shareDataTextOnly);
                 notified = true;
              } catch(err) {
@@ -667,7 +666,6 @@
             notified = true; 
           }
         } 
-        // ★★★ FIN LÓGICA DE NOTIFICACIÓN ★★★
         
         if(notified) { showMessage(p ? 'Paquete actualizado (Abriendo app...)' : 'Paquete registrado (Abriendo app...)', 'success', 4000); } 
         else { showMessage(p ? 'Paquete actualizado' : 'Paquete registrado', 'success'); }
@@ -675,7 +673,13 @@
         comentariosPaquete.value = ''; fotoPreview.innerHTML = ''; notificarSi.checked = true;
         await refreshPaquetes(); await rebuildAutocomplete();
       }catch(err){ const errorMsg = (err.name === 'ConstraintError' || (err.message && err.message.includes('key'))) ? 'Error: Guía duplicada.' : 'Error al guardar.'; showMessage(errorMsg, 'error'); console.error(err); }
-    });
+    }
+    // ★★★ FIN NUEVA FUNCIÓN CON NOMBRE PARA EVITAR DUPLICACIÓN DEL LISTENER ★★★
+
+    // Eliminar cualquier listener previo que pudiera estar duplicando el evento (seguridad extra)
+    recibirBtn.removeEventListener('click', handleRecibirPaquete);
+    // Asignar el listener de forma limpia
+    recibirBtn.addEventListener('click', handleRecibirPaquete);
 
     // --- FLUJO DE ENTREGA (sin cambios) ---
     entregarBtn.addEventListener('click', async ()=>{
