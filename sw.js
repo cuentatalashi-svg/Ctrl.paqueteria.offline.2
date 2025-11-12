@@ -1,6 +1,6 @@
 // Nombre del caché (cámbialo SIEMPRE si actualizas los archivos principales)
-// ★★★ CAMBIO: Incremento la versión del caché a v2 ★★★
-const CACHE_NAME = 'ctrl-paq-cache-v2';
+// ★★★ CAMBIO: Incremento la versión del caché a v3 para asegurar la carga del CDN. ★★★
+const CACHE_NAME = 'ctrl-paq-cache-v3';
 
 // "App Shell" - Archivos necesarios para que la app funcione offline
 const urlsToCache = [
@@ -25,16 +25,17 @@ const externalUrls = [
 // Evento "install": se dispara cuando el SW se instala
 self.addEventListener('install', event => {
   console.log('[SW] Instalando...');
-  // GUARANTEE: Se espera a que TODOS los archivos esenciales se guarden en caché.
+  // GUARANTEE: Se espera a que TODOS los archivos esenciales (incluyendo el CDN) se guarden en caché.
   // Esto es la base para el funcionamiento offline inicial.
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
-        console.log('[SW] Abriendo caché y guardando app shell');
-        // Cachear solo los archivos locales
-        return cache.addAll(urlsToCache);
+        console.log('[SW] Abriendo caché y guardando app shell y librerías CDN');
+        // Cachear archivos locales Y las librerías CDN
+        return cache.addAll(urlsToCache.concat(externalUrls));
       })
       .then(() => self.skipWaiting()) // Forzar al SW a activarse
+      .catch(err => console.error('[SW] Fallo crítico al precachear:', err))
   );
 });
 
@@ -72,7 +73,6 @@ function staleWhileRevalidate(request) {
         return response;
       }).catch(error => {
         console.error('[SW] Fallo al revalidar desde la red:', error, request.url);
-        // Si la red falla y hay una copia antigua, se usa esa, si no, se propaga el error.
         throw error; 
       });
 
@@ -82,6 +82,31 @@ function staleWhileRevalidate(request) {
     });
   });
 }
+
+// Estrategia: Cache First para librerías CDN (lo que soluciona tu problema con jsPDF)
+function cacheFirst(request) {
+    return caches.match(request).then(cachedResponse => {
+        // Devuelve la respuesta del caché inmediatamente si existe
+        if (cachedResponse) {
+            return cachedResponse;
+        }
+
+        // Si no está en caché, va a la red y guarda la copia
+        return fetch(request).then(networkResponse => {
+            if (networkResponse && networkResponse.status === 200 && request.method === 'GET') {
+                caches.open(CACHE_NAME).then(cache => {
+                    cache.put(request, networkResponse.clone());
+                });
+            }
+            return networkResponse;
+        }).catch(error => {
+            console.error('[SW] Fallo crítico al obtener CDN (offline):', error, request.url);
+            // Si falla la red, devuelve un error.
+            throw error;
+        });
+    });
+}
+
 
 // Evento "fetch": se dispara cada vez que la app pide un recurso
 self.addEventListener('fetch', event => {
@@ -99,30 +124,15 @@ self.addEventListener('fetch', event => {
     return;
   }
   
-  // 2. Librerías externas - Usar Cache First (o la estrategia original)
+  // 2. Librerías externas (jsPDF) - Usar Cache First
   if (isExternalLibrary) {
-     event.respondWith(
-        caches.match(event.request).then(cachedResponse => {
-           // Si está en caché, devuelve el caché (offline garantizado para libs)
-           return cachedResponse || fetch(event.request).then(networkResponse => {
-               return caches.open(CACHE_NAME).then(cache => {
-                   // Cachar las librerías externas para reuso
-                   cache.put(event.request, networkResponse.clone());
-                   return networkResponse;
-               });
-           }).catch(error => {
-               // Si no está en caché y la red falla, se devuelve un error de red.
-               console.error('[SW] Fallo al cargar librería externa:', error, event.request.url);
-           });
-        })
-     );
+     event.respondWith(cacheFirst(event.request));
      return;
   }
 
-  // 3. Otros (Imágenes dinámicas, etc.) - Red First o solo red
+  // 3. Otros (Imágenes dinámicas, etc.) - Solo red con fallback a caché
   event.respondWith(fetch(event.request).catch(error => {
       console.error('[SW] Fallo de red:', error, event.request.url);
-      // Fallback al caché si la red falla (para cualquier otra imagen que haya cacheado)
       return caches.match(event.request); 
   }));
 });
