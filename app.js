@@ -1,4 +1,4 @@
-/* app.js final: +Foto Guardia +Comentarios +Opcion Notificar +Historial Cards +COMPRESION + TOAST + RESPALDO + ZXING / BarcodeDetector + QR (Modo "Scan-All") + FIX LOGIN HASH + FIX BUGS + PWA + FIX SHARE ANDROID v7 (Quitar Title) */
+/* app.js final: +Foto Guardia +Comentarios +Opcion Notificar +Historial Cards +COMPRESION + TOAST + RESPALDO + ZXING / BarcodeDetector + QR (Modo "Scan-All") + FIX LOGIN HASH + FIX BUGS + PWA + FIX SHARE ANDROID v7 (Quitar Title) + FIX DOMICILIO EXACTO */
 (async function(){
   
   // --- INICIO REGISTRO PWA SERVICE WORKER ---
@@ -454,7 +454,7 @@
         return true;
       }).sort((a,b)=>b.created - a.created);
       historialPaquetes.innerHTML = '';
-      const fallbackGuardiaImg = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxZW0iIGhlaWdodD0iMWVtIiB2aWV3Qm94PSIwIDAgMjQgMjUiPjxwYXRoIGZpbGw9ImN1cnJlbnRDb2xvciIgZD0iTTIyIDlpLTJ2MGE1IDUgMCAwIDAtNy4xNi00LjcyTDEyIDEwLjA5TDExLjE2IDQuMjdBNCA0IDAgMCAwIDggNUg1YTMgMyAwIDAgMC0zIDN2MWEzIDMgMCAwIDAgMyAzSDh2N0g2djJoMTJ2LTJoLTJ2LTd6TTkgN2EyIDIgMCAwIDEgMiAyaC43Nkw5LjM4IDdoLjI5em0yIDVWNC4wN2E0IDQgMCAwIDEgMS4xNi00LjcyTDEyIDEwLjA5TDExLjE2IDQuMjdBNCA0IDAgMCAwIDggNUg1YTMgMyAwIDAgMC0zIDN2MWEzIDMgMCAwIDAgMyAzSDh2N0g2djJoMTJ2LTJoLTJ2LTd6TTkgN2EyIDIgMCAwIDEgMiAyaC43Nkw5LjM4IDdoLjI5em0yIDVWNC4wN2E0IDQgMCAwIDEgMS4zOCAxbDIuMjQgNy55M0gxMWExIDEgMCAwIDAtMS0xVjdoMVoiLz48L3N2Zz4=';
+      const fallbackGuardiaImg = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxZW0iIGhlaWdodD0iMWVtIiB2aWV3Qm94PSIwIDAgMjQgMjUiPjxwYXRoIGZpbGw9ImN1cnJlbnRDb2xvciIgZD0iTTIyIDlpLTJ2MGE1IDUgMCAwIDAtNy4xNi00LjcyTDEyIDEwLjA5TDExLjE2IDQuMjdBNCA0IDAgMCAwIDggNUg1YTMgMyAwIDAgMC0zIDN2MWEzIDMgMCAwIDAgMyAzSDh2N0g2djJoMTJ2LTJoLTJ2LTd6TTkgN2EyIDIgMCAwIDEgMiAyaC43Nkw5LjM4IDdoLjI5em0yIDVWNC4wN2E0IDQgMCAwIDEgMS4xNi00LjcyTDEyIDEwLjA5TDExLjE2IDQuMjdBNCA0IDAgMCAwIDggNUg1YTMgMyAwIDAgMC0zIDN2MWEzIDMgMCAwIDAgMyAzSDh2N0g2djJoMTJ2LTJoLTJ2LTd6TTkgN2EyIDIgMCAwIDEgMiAyaC43Nkw5LjM4IDdoLjI5em0yIDVWNC4wN2E0IDQgMCAwIDEgMS4zOCAxbDIuMjQgNy45M0gxMWExIDEgMCAwIDAtMS0xVjdoMVoiLz48L3N2Zz4=';
       rows.forEach(p=>{
         const card = document.createElement('div'); card.className = `historial-card estado-${p.estado || 'na'}`;
         let thumbsHTML = '';
@@ -508,45 +508,51 @@
       }
     });
 
-    // --- Lógica de entrega múltiple (CORREGIDA) ---
+    // --- Lógica de entrega múltiple (CORREGIDA para coincidencia EXACTA) ---
     const handleDomicilioInput = async () => {
       const dom = domicilioInput.value.trim();
       const domLower = dom.toLowerCase();
       
-      if (!dom) { return; }
+      // La búsqueda de entrega múltiple solo aplica si no hay guía
+      if (!dom || guiaEl.value.trim().length > 0) { 
+          // Ocultar modal si no hay domicilio o si se empezó a escribir una guía
+          confirmEntregarVariosModal.classList.add('hidden');
+          currentBatchToDeliver = [];
+          return;
+      }
       
+      // Evitar ejecutar si ya estamos en un modal de confirmación
       if (!confirmEntregarModal.classList.contains('hidden') || !confirmEntregarVariosModal.classList.contains('hidden') || !firmaModal.classList.contains('hidden')) { return; }
-      if (guiaEl.value.trim().length > 0) { return; }
       
       const paqs = await getAll('paquetes');
       
-      // ★★★ CORRECCIÓN 1: Cambiar .includes() por === para una coincidencia exacta ★★★
+      // ★★★ CAMBIO CRÍTICO: Usar comparación estricta (===) para el domicilio ★★★
       const paquetesParaEntregar = paqs.filter(p => 
         p.domicilio && 
-        p.domicilio.toLowerCase() === domLower && // <-- ¡CAMBIO AQUÍ!
+        p.domicilio.toLowerCase() === domLower && // <-- ¡CAMBIO AQUÍ! (Coincidencia Exacta)
         p.estado === 'en_caseta'
       );
       
       if (paquetesParaEntregar.length > 0) {
         currentBatchToDeliver = paquetesParaEntregar;
         
-        // ★★★ CORRECCIÓN 2: Simplificación. Ya no se necesita 'primerDomicilio' ni re-filtrar ★★★
-        // const primerDomicilio = paquetesParaEntregar[0].domicilio;
-        // const paquetesDelMismoDomicilio = paquetesParaEntregar.filter(p => p.domicilio === primerDomicilio);
+        domicilioVariosTxt.textContent = dom;
         
-        domicilioVariosTxt.textContent = dom; // <-- Usar 'dom' (el valor exacto buscado)
-        
-        listaPaquetesVarios.innerHTML = '<ul>' + paquetesParaEntregar.map(p => { // <-- Usar 'paquetesParaEntregar'
+        listaPaquetesVarios.innerHTML = '<ul>' + paquetesParaEntregar.map(p => {
             const fotoMiniatura = p.foto ? `<img src="${p.foto}" class="thumb-miniatura" data-paquete-id="${p.id}" data-type="foto" alt="foto paquete">` : '';
             return `<li style="display: flex; align-items: center; gap: 8px;">${fotoMiniatura}<div><strong>${p.guia}</strong> - ${p.nombre}<div class="info-paquete">${p.paqueteria || 'Sin paquetería'} | Recibido: ${formatDate(p.created)}</div></div></li>`;
           }).join('') + '</ul>';
         
         confirmEntregarVariosModal.classList.remove('hidden');
+      } else {
+          // Si no hay coincidencias exactas y el modal está visible, lo ocultamos
+          confirmEntregarVariosModal.classList.add('hidden');
+          currentBatchToDeliver = [];
       }
     };
     const debouncedDomicilioSearch = () => {
       clearTimeout(domicilioDebounceTimer);
-      domicilioDebounceTimer = setTimeout(handleDomicilioInput, 1000);
+      domicilioDebounceTimer = setTimeout(handleDomicilioInput, 500); // Reduje el debounce a 500ms
     };
     domicilioInput.addEventListener('input', debouncedDomicilioSearch);
     domicilioInput.addEventListener('paste', debouncedDomicilioSearch);
@@ -807,7 +813,7 @@
       const calle = document.getElementById('domCalle').value.trim(); const res1 = document.getElementById('domResidente1').value.trim();
       const nota = document.getElementById('domNota').value.trim(); const telefono = document.getElementById('domTelefono').value.trim();
       const cleanPhone = telefono.replace(/[^0-9]/g, ''); 
-      if(telefono && (!cleanPhone || cleanPhone.length < 10)) { showMessage('Teléfono inválido. Use solo números.', 'error'); return; }
+      if(telefono && (!cleanPhone || cleanPhone.length < 10)) { showMessage('Teléfono inválido. Use solo números', 'error'); return; }
       const otros = Array.from(document.querySelectorAll('.residenteField')).map(i=>i.value.trim()).filter(Boolean);
       const residentes = [res1, ...otros];
       showMessage('Guardando domicilio...', 'loading', 0);
@@ -1038,7 +1044,7 @@
       if (users.length === 0) { tablaUsuarios.innerHTML = '<p class="muted">No hay usuarios registrados.</p>'; return; }
       users.forEach(u => {
         const row = document.createElement('div'); row.className = 'row';
-        row.innerHTML = `<div class="info" style="display: flex; align-items: center; gap: 10px;"><img src="${u.foto || 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxZW0iIGhlaWdodD0iMWVtIiB2aWV3Qm94PSIwIDAgMjQgMjUiPjxwYXRoIGZpbGw9ImN1cnJlbnRDb2xvciIgZD0iTTIyIDlpLTJ2MGE1IDUgMCAwIDAtNy4xNi00LjcyTDEyIDEwLjA5TDExLjE2IDQuMjdBNCA0IDAgMCAwIDggNUg1YTMgMyAwIDAgMC0zIDN2MWEzIDMgMCAwIDAgMyAzSDh2N0g2djJoMTJ2LTJoLTJ2LTd6TTkgN2EyIDIgMCAwIDEgMiAyaC43Nkw5LjM4IDdoLjI5em0yIDVWNC4wN2E0IDQgMCAwIDEgMS4zOCAxbDIuMjQgNy55M0gxMWExIDEgMCAwIDAtMS0xVjdoMVoiLz48L3N2Zz4='}" class="guardia-thumb"><div><strong>${u.nombre}</strong><div class="muted">Usuario: ${u.usuario} | Rol: ${u.rol || 'guardia'}</div></div></div><div>${u.id === user.id ? '<span class="muted">(Tú)</span>' : `<button class="btn danger-ghost" data-id="${u.id}" data-act="delete_user">Eliminar</button>`}</div>`;
+        row.innerHTML = `<div class="info" style="display: flex; align-items: center; gap: 10px;"><img src="${u.foto || 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxZW0iIGhlaWdodD0iMWVtIiB2aWV3Qm94PSIwIDAgMjQgMjUiPjxwYXRoIGZpbGw9ImN1cnJlbnRDb2xvciIgZD0iTTIyIDlpLTJ2MGE1IDUgMCAwIDAtNy4xNi00LjcyTDEyIDEwLjA5TDExLjE2IDQuMjdBNCA0IDAgMCAwIDggNUg1YTMgMyAwIDAgMC0zIDN2MWEzIDMgMCAwIDAgMyAzSDh2N0g2djJoMTJ2LTJoLTJ2LTd6TTkgN2EyIDIgMCAwIDEgMiAyaC43Nkw5LjM4IDdoLjI5em0yIDVWNC4wN2E0IDQgMCAwIDEgMS4zOCAxbDIuMjQgNy45M0gxMWExIDEgMCAwIDAtMS0xVjdoMVoiLz48L3N2Zz4='}" class="guardia-thumb"><div><strong>${u.nombre}</strong><div class="muted">Usuario: ${u.usuario} | Rol: ${u.rol || 'guardia'}</div></div></div><div>${u.id === user.id ? '<span class="muted">(Tú)</span>' : `<button class="btn danger-ghost" data-id="${u.id}" data-act="delete_user">Eliminar</button>`}</div>`;
         tablaUsuarios.appendChild(row);
       });
     }
@@ -1049,7 +1055,7 @@
         const u = e.target.closest('.row').querySelector('.info strong').textContent;
         itemToDelete = { type: 'usuario', id: id };
         deleteConfirmMsg.textContent = `¿Estás seguro de eliminar al usuario ${u}? Esta acción no se puede deshacer.`;
-        deleteConfirmModal.classList.add('hidden');
+        deleteConfirmModal.classList.remove('hidden');
       }
     });
     refreshUsersBtn.addEventListener('click', refreshUsuarios);
