@@ -1,4 +1,4 @@
-/* app.js final: +Foto Guardia +Comentarios +Opcion Notificar +Historial Cards +COMPRESION + TOAST + RESPALDO + ZXING / BarcodeDetector + QR (Modo "Scan-All") + FIX LOGIN HASH + FIX BUGS + PWA + FIX SHARE ANDROID v7 (Quitar Title) + FIX DOMICILIO EXACTO */
+/* app.js final: +Foto Guardia +Comentarios +Opcion Notificar +Historial Cards +COMPRESION + TOAST + RESPALDO + ZXING / BarcodeDetector + QR (Modo "Scan-All") + FIX LOGIN HASH + FIX BUGS + PWA + FIX SHARE ANDROID v7 (Quitar Title) + FIX DOMICILIO EXACTO + FIX JPDF + FIX NOTIFICACION DUPLICADA */
 (async function(){
   
   // --- INICIO REGISTRO PWA SERVICE WORKER ---
@@ -17,8 +17,13 @@
 
   // --- INICIO SETUP DE jspdf ---
   let jsPDF;
-  if(window.jspdf) {
+  // ★★★ CORRECCIÓN AQUÍ: Acceso más robusto a la clase jsPDF del CDN umd ★★★
+  // La librería UMD suele exponer la clase constructora bajo 'jspdf.jsPDF'
+  if(window.jspdf && window.jspdf.jsPDF) {
     jsPDF = window.jspdf.jsPDF;
+  } else if (typeof window.jsPDF === 'function') {
+    // Caso de otros CDN o versiones más antiguas
+    jsPDF = window.jsPDF;
   }
   // --- FIN SETUP ---
 
@@ -178,8 +183,9 @@
   // MAIN SPA
   if(document.body.classList.contains('page-main')){
     
+    // ★★★ CORRECCIÓN: Se movió la verificación de jsPDF para que solo deshabilite el botón. ★★★
     if (!jsPDF) {
-      console.error("jsPDF no se cargó correctamente.");
+      console.warn("jsPDF no se cargó correctamente. El botón de PDF estará deshabilitado.");
       const pdfBtn = document.getElementById('downloadPdfBtn');
       if(pdfBtn) pdfBtn.disabled = true;
     }
@@ -568,7 +574,7 @@
       }
     });
 
-    // --- RECIBIR PAQUETE (CON CORRECCIÓN DE SHARE API v7 - Quitar Title) ---
+    // --- RECIBIR PAQUETE (FIX: Notificación se ejecuta SOLO AQUÍ y una vez) ---
     recibirBtn.addEventListener('click', async ()=>{
       clearMessage();
       const guia = guiaEl.value.trim();
@@ -588,6 +594,8 @@
         const id = p ? await putItem('paquetes', {...paquete, id: p.id}) : await addItem('paquetes', paquete);
         if (!p) { await addItem('historial',{paqueteId:id,estado:'en_caseta',usuario:user.nombre,fecha:Date.now(),nota:''}); }
         let notified = false;
+        
+        // ★★★ INICIO LÓGICA DE NOTIFICACIÓN (Solo si está marcado) ★★★
         if (notificarSi.checked) {
           const dom = domicilioInput.value.trim(); let domInfo = null;
           if (dom) { const doms = await getAll('domicilios'); domInfo = doms.find(d => d.calle === dom); }
@@ -597,8 +605,7 @@
           const comentariosMsg = comentarios ? `\nComentarios: ${comentarios}` : '';
           const msg = `📦 *PAQUETE EN CASETA* 📦\nHola ${nombreRes}, se ha recibido 1 paquete para su domicilio.\n\n${domInfoMsg}\n${paqInfo}${comentariosMsg}\n\nRecibido por: ${user.nombre}.`;
 
-          // --- INICIO CORRECCIÓN ANDROID SHARE (v7 - Quitar Title) ---
-          
+          // --- Corregido Web Share API (v7 - Quitar Title) ---
           const fotoFile = dataURLtoFile(fotoDataURL, `paquete_${guia}.png`);
           const bannerDataURL = await createBannerImage('✅ Paquete en Caseta ✅');
           const bannerFile = dataURLtoFile(bannerDataURL, 'notificacion.png');
@@ -607,11 +614,8 @@
           if (bannerFile) { files.push(bannerFile); }
           if (fotoFile) { files.push(fotoFile); }
           
-          // ★★★ LA CORRECCIÓN ESTÁ AQUÍ ★★★
-          // Se eliminó la propiedad "title" de ambos objetos
           const shareDataWithFiles = { text: msg, files: files };
           const shareDataTextOnly = { text: msg };
-          // ★★★ FIN DE LA CORRECCIÓN ★★★
 
           let canShareFiles = false;
 
@@ -662,8 +666,9 @@
             window.open(url, '_blank'); 
             notified = true; 
           }
-          // --- FIN CORRECCIÓN ANDROID SHARE (v7) ---
         } 
+        // ★★★ FIN LÓGICA DE NOTIFICACIÓN ★★★
+        
         if(notified) { showMessage(p ? 'Paquete actualizado (Abriendo app...)' : 'Paquete registrado (Abriendo app...)', 'success', 4000); } 
         else { showMessage(p ? 'Paquete actualizado' : 'Paquete registrado', 'success'); }
         guiaEl.value=''; nombreDest.value=''; paqueteriaInput.value=''; domicilioInput.value=''; fotoInput.value='';
@@ -742,11 +747,9 @@
         if (firmaFile) files.push(firmaFile); 
         if (idFile) files.push(idFile);
         
-        // ★★★ LA CORRECCIÓN ESTÁ AQUÍ ★★★
-        // Se eliminó la propiedad "title" de ambos objetos
+        // ★★★ La lógica de notificación de ENTREGA se mantiene intacta ★★★
         const shareDataWithFiles = { text: msg, files: files };
         const shareDataTextOnly = { text: msg };
-        // ★★★ FIN DE LA CORRECCIÓN ★★★
 
         let canShareFiles = false;
 
@@ -1061,7 +1064,12 @@
     refreshUsersBtn.addEventListener('click', refreshUsuarios);
     downloadPdfBtn.addEventListener('click', descargarPDF);
     async function descargarPDF() {
-      if (userRol !== 'admin' || !jsPDF) { showMessage('Error: La librería PDF no se cargó', 'error'); return; }
+      if (userRol !== 'admin') return;
+      // ★★★ CORRECCIÓN: Doble chequeo aquí y mensaje de error más claro si falla. ★★★
+      if (!jsPDF) { 
+        showMessage('Error: La librería PDF (jsPDF) no cargó. Revise su conexión y recargue.', 'error'); 
+        return; 
+      }
       showMessage('Generando PDF... por favor espera', 'loading', 0);
       try {
         const doc = new jsPDF(); const allPaquetes = await getAll('paquetes'); const allDomicilios = await getAll('domicilios');
