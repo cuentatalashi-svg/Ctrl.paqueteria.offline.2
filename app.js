@@ -17,10 +17,11 @@
 
   // --- INICIO SETUP DE jspdf ---
   let jsPDF;
-  // ★★★ CORRECCIÓN AQUÍ: Acceso más robusto a la clase jsPDF del CDN umd ★★★
+  // ★★★ CAMBIO: Ahora que las librerías son locales (umd), la clase debería estar disponible en window.jspdf.jsPDF ★★★
   if(window.jspdf && window.jspdf.jsPDF) {
     jsPDF = window.jspdf.jsPDF;
   } else if (typeof window.jsPDF === 'function') {
+    // Si la versión antigua de UMD se registró directamente en window
     jsPDF = window.jsPDF;
   }
   // --- FIN SETUP ---
@@ -1110,4 +1111,5 @@
     
   }
 })();
+
 
