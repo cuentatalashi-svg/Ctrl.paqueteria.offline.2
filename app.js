@@ -294,7 +294,7 @@
     let currentBatchToDeliver = []; 
     let domicilioDebounceTimer; 
     
-    // --- SISTEMA DE NOTIFICACIÓN TOAST (sin cambios) ---
+    // --- SISTEMA DE NOTIFICACIÓN TOAST (con corrección de animación) ---
     let toastTimer;
     const toast = document.getElementById('toastNotification');
     const toastIcon = document.getElementById('toastIcon');
@@ -313,16 +313,27 @@
       toast.className = 'toast-container';
       toast.classList.add(type);
       toast.classList.add('show');
-      toast.classList.remove('hiding');
+      // ★★★ CAMBIO: Quitar clase 'hiding' y animación de salida forzada para evitar el 'cuadro negro' ★★★
+      toast.classList.remove('hiding'); 
       if (type !== 'loading' && duration > 0) {
-        toastTimer = setTimeout(() => { hideToast(); }, duration);
+        // Usar una función que solo quite la clase 'show'
+        toastTimer = setTimeout(() => { 
+          toast.classList.remove('show');
+          // Limpiar clases después de la transición de CSS (500ms)
+          setTimeout(() => {
+            toast.classList.remove('success', 'error', 'loading', 'info');
+            toastIcon.innerHTML = '';
+            toastMessage.textContent = '';
+          }, 500);
+        }, duration);
       }
     }
     function hideToast() {
       if (!toast) return;
       clearTimeout(toastTimer);
+      // ★★★ CAMBIO: Usar clase 'hiding' para la transición de CSS, si existe, o solo remover 'show' ★★★
       toast.classList.remove('show');
-      toast.classList.add('hiding');
+      toast.classList.add('hiding'); // Esta clase se usará en CSS para la transición
       setTimeout(() => {
         toast.classList.remove('hiding', 'success', 'error', 'loading', 'info');
         toastIcon.innerHTML = '';
@@ -577,17 +588,21 @@
       clearMessage();
       const guia = guiaEl.value.trim();
       const nombre = nombreDest.value.trim();
+      const domicilio = domicilioInput.value.trim(); // Obtener valor de domicilio
       const comentarios = comentariosPaquete.value.trim(); 
       const fotoActual = fotoInput.files[0]; 
       const fotoExistente = fotoPreview.querySelector('img') ? fotoPreview.querySelector('img').src : null; 
-      if(!guia || !nombre){ showMessage('Guía y nombre son obligatorios', 'error'); return; }
+      
+      // ★★★ CAMBIO: Validación de domicilio (obligatorio) ★★★
+      if(!guia || !nombre || !domicilio){ showMessage('Guía, nombre y domicilio son obligatorios', 'error'); return; }
+      
       if (!fotoActual && !fotoExistente) { showMessage('Es obligatorio tomar foto del paquete', 'error'); return; }
       showMessage('Guardando paquete...', 'loading', 0);
       const paqs = await getAll('paquetes');
       const p = paqs.find(x => x.guia === guia);
       if (p && p.estado === 'entregado') { showMessage('Ese paquete ya fue entregado', 'error'); return; }
       const fotoDataURL = fotoActual ? await compressImage(fotoActual) : fotoExistente;
-      const paquete = { guia, nombre, paqueteria: paqueteriaInput.value, domicilio: domicilioInput.value, foto: fotoDataURL, estado: 'en_caseta', created: Date.now(), recibidoPor: user.nombre, fotoRecibidoPor: userFoto, comentarios: comentarios, entregadoPor: null, fotoEntregadoPor: null, entregadoEn: null, firma: null, idFoto: null };
+      const paquete = { guia, nombre, paqueteria: paqueteriaInput.value, domicilio: domicilio, foto: fotoDataURL, estado: 'en_caseta', created: Date.now(), recibidoPor: user.nombre, fotoRecibidoPor: userFoto, comentarios: comentarios, entregadoPor: null, fotoEntregadoPor: null, entregadoEn: null, firma: null, idFoto: null };
       try{
         const id = p ? await putItem('paquetes', {...paquete, id: p.id}) : await addItem('paquetes', paquete);
         if (!p) { await addItem('historial',{paqueteId:id,estado:'en_caseta',usuario:user.nombre,fecha:Date.now(),nota:''}); }
@@ -1043,7 +1058,7 @@
       }
     });
 
-    // --- Funciones Admin (sin cambios) ---
+    // --- Funciones Admin (con corrección de color PDF) ---
     async function refreshUsuarios() {
       if (userRol !== 'admin') return;
       const users = await getAll('users');
@@ -1081,9 +1096,11 @@
         doc.setFontSize(18); doc.text('Reporte de Paquetería', 14, 22); doc.setFontSize(11); doc.setTextColor(100);
         doc.text(`Generado por: ${user.nombre} (${user.rol})`, 14, 28); doc.text(`Fecha: ${fechaHoy}`, 14, 34);
         const enCaseta = allPaquetes.filter(p => p.estado === 'en_caseta');
-        doc.autoTable({ startY: 40, head: [['Guía', 'Domicilio', 'Residente', 'Recibido (Fecha)', 'Recibido (Guardia)', 'Comentarios']], body: enCaseta.map(p => [ p.guia, p.domicilio, p.nombre, formatDate(p.created), p.recibidoPor, p.comentarios || '-' ]), headStyles: { fillColor: [11, 58, 102] }, didDrawPage: (data) => { doc.setFontSize(16); doc.text('Paquetes Actualmente en Caseta', data.settings.margin.left, data.settings.top - 10); } });
+        // ★★★ CAMBIO: Color de encabezado de tabla a VERDE OSCURO (del theme) ★★★
+        doc.autoTable({ startY: 40, head: [['Guía', 'Domicilio', 'Residente', 'Recibido (Fecha)', 'Recibido (Guardia)', 'Comentarios']], body: enCaseta.map(p => [ p.guia, p.domicilio, p.nombre, formatDate(p.created), p.recibidoPor, p.comentarios || '-' ]), headStyles: { fillColor: [10, 54, 10] }, didDrawPage: (data) => { doc.setFontSize(16); doc.text('Paquetes Actualmente en Caseta', data.settings.margin.left, data.settings.top - 10); } });
         const entregados = allPaquetes.filter(p => p.estado === 'entregado').sort((a,b) => b.entregadoEn - a.entregadoEn).slice(0, 50);
-        doc.autoTable({ head: [['Guía', 'Domicilio', 'Residente', 'Entregado (Fecha)', 'Entregado (Guardia)', 'Comentarios']], body: entregados.map(p => [ p.guia, p.domicilio, p.nombre, formatDate(p.entregadoEn), p.entregadoPor, p.comentarios || '-' ]), headStyles: { fillColor: [21, 128, 61] }, didDrawPage: (data) => { doc.setFontSize(16); doc.text('Últimos 50 Paquetes Entregados', data.settings.margin.left, data.settings.top - 10); } });
+        // ★★★ CAMBIO: Color de encabezado de tabla a VERDE PRIMARIO (del theme) ★★★
+        doc.autoTable({ head: [['Guía', 'Domicilio', 'Residente', 'Entregado (Fecha)', 'Entregado (Guardia)', 'Comentarios']], body: entregados.map(p => [ p.guia, p.domicilio, p.nombre, formatDate(p.entregadoEn), p.entregadoPor, p.comentarios || '-' ]), headStyles: { fillColor: [40, 167, 69] }, didDrawPage: (data) => { doc.setFontSize(16); doc.text('Últimos 50 Paquetes Entregados', data.settings.margin.left, data.settings.top - 10); } });
         doc.autoTable({ head: [['Domicilio', 'Residentes', 'Teléfono', 'Nota']], body: allDomicilios.map(d => [ d.calle, (d.residentes || []).join(', '), d.telefono || '-', d.nota || '-' ]), headStyles: { fillColor: [107, 114, 128] }, didDrawPage: (data) => { doc.setFontSize(16); doc.text('Directorio de Domicilios', data.settings.margin.left, data.settings.top - 10); } });
         doc.save(`Reporte_CtrlPaqueteria_${new Date().toISOString().split('T')[0]}.pdf`);
         showMessage('PDF generado.', 'success');
@@ -1093,5 +1110,4 @@
     
   }
 })();
-
 
