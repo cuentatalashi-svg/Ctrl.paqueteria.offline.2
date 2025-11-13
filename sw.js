@@ -1,6 +1,6 @@
 // Nombre del caché (cámbialo SIEMPRE si actualizas los archivos principales)
-// ★★★ CAMBIO: Incremento la versión del caché a v3 para asegurar la carga del CDN. ★★★
-const CACHE_NAME = 'ctrl-paq-cache-v3';
+// ★★★ CAMBIO: Incremento la versión del caché a v4 para forzar la recarga de CDN. ★★★
+const CACHE_NAME = 'ctrl-paq-cache-v4';
 
 // "App Shell" - Archivos necesarios para que la app funcione offline
 const urlsToCache = [
@@ -136,5 +136,4 @@ self.addEventListener('fetch', event => {
       return caches.match(event.request); 
   }));
 });
-
 
