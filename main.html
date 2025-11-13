@@ -7,7 +7,6 @@
   
   <!-- INICIO ETIQUETAS PWA -->
   <link rel="manifest" href="manifest.webmanifest">
-  <!-- ★★★ CAMBIO: Aplicar el nuevo color de tema verde ★★★ -->
   <meta name="theme-color" content="#0a360a"> 
   <link rel="apple-touch-icon" href="icon-192.svg">
   <!-- FIN ETIQUETAS PWA -->
@@ -302,8 +301,9 @@
   </nav>
 
   <!-- Scripts de la App -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+  <!-- ★★★ CAMBIO: Usar archivos locales en lugar de CDN ★★★ -->
+  <script src="jspdf.umd.js"></script>
+  <script src="jspdf.plugin.autotable.js"></script>
   
   <!-- Librería de escáner (ZXing) -->
   <script src="zxing.min.js"></script>
