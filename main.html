@@ -7,7 +7,8 @@
   
   <!-- INICIO ETIQUETAS PWA -->
   <link rel="manifest" href="manifest.webmanifest">
-  <meta name="theme-color" content="#0b2545">
+  <!-- ★★★ CAMBIO: Aplicar el nuevo color de tema verde ★★★ -->
+  <meta name="theme-color" content="#0a360a"> 
   <link rel="apple-touch-icon" href="icon-192.svg">
   <!-- FIN ETIQUETAS PWA -->
 
@@ -67,9 +68,14 @@
     #firmaModal .modal-footer .row { margin-top: 0; }
 
     /* --- Resto de estilos (sin cambios) --- */
-    .toast-container { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 18px 25px; border-radius: 12px; background-color: rgba(30, 30, 30, 0.95); color: white; display: flex; align-items: center; gap: 15px; z-index: 10000; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2); opacity: 0; pointer-events: none; transition: opacity 0.3s ease; animation: toastFadeOut 0.5s ease-in forwards; }
+    /*
+      ★★★ ELIMINACIÓN DE CUADRO NEGRO DEL TOAST ★★★
+      Quito la animación 'toastFadeOut' que forzaba el fin y causaba un parpadeo.
+      Ahora el CSS solo maneja la entrada (fade-in) y la salida (usando 'hiding' y transition).
+    */
+    .toast-container { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 18px 25px; border-radius: 12px; background-color: rgba(30, 30, 30, 0.95); color: white; display: flex; align-items: center; gap: 15px; z-index: 10000; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2); opacity: 0; pointer-events: none; transition: opacity 0.3s ease, transform 0.3s ease; animation: none; }
     .toast-container.show { opacity: 1; pointer-events: auto; animation: toastFadeIn 0.3s ease-out forwards; }
-    .toast-container.hiding { opacity: 0; animation: toastFadeOut 0.5s ease-in forwards; }
+    .toast-container.hiding { opacity: 0; transform: translate(-50%, -60%); transition: opacity 0.5s ease, transform 0.5s ease; animation: none; }
     .toast-icon { flex-shrink: 0; width: 32px; height: 32px; display: grid; place-items: center; }
     .toast-icon svg { width: 100%; height: 100%; }
     .toast-message { font-size: 1.1em; font-weight: 500; white-space: nowrap; }
@@ -79,7 +85,6 @@
     .toast-container.loading { background-color: rgba(30, 30, 30, 0.95); }
     .toast-icon .spinner { animation: spin 1s linear infinite; }
     @keyframes toastFadeIn { from { opacity: 0; transform: translate(-50%, -40%); } to { opacity: 1; transform: translate(-50%, -50%); } }
-    @keyframes toastFadeOut { from { opacity: 1; transform: translate(-50%, -50%); } to { opacity: 0; transform: translate(-50%, -60%); } }
     @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
     /* Estilos del nuevo escáner (ZXing) */
@@ -166,15 +171,18 @@
       <section id="screen-paqueteria" class="screen card">
         <h3>Registrar Paquetería 📦</h3>
         <div class="block">
-          <label class="field"><span>Domicilio</span><input id="domicilioInput" placeholder="Busca domicilio (autocompletar)" list="domList" /><datalist id="domList"></datalist></label>
+          <!-- Campo Domicilio: ahora es requerido en app.js -->
+          <label class="field"><span>Domicilio (Obligatorio)</span><input id="domicilioInput" placeholder="Busca o escribe el domicilio" list="domList" /><datalist id="domList"></datalist></label>
           <label class="field">
-            <span>Guía (últimos 6 dígitos)</span>
-            <!-- Input de guía con botón de escáner -->
+            <span>Escanea o escribe la guía (Permite Letras y Números)</span>
+            <!-- Input de guía con botón de escáner (modificado) -->
             <div class="field-with-button">
-              <input id="guia" inputmode="numeric" maxlength="40" placeholder="Escribe o escanea la guía" />
-              <button id="startScannerBtn" class="btn ghost icon-btn" aria-label="Escanear código">
-                <!-- Icono SVG de escáner -->
-                <svg xmlns="http://www.w3.org/2000/svg" width="1.2em" height="1.2em" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7V5a2 2 0 0 1 2-2h2M4 17v2a2 2 0 0 0 2 2h2m8-16h2a2 2 0 0 1 2 2v2m0 8v2a2 2 0 0 1-2 2h-2M7 12h10"/></svg>
+              <!-- inputmode='text' para permitir letras y números, y quitamos maxlength numérico -->
+              <input id="guia" inputmode="text" maxlength="50" placeholder="Escribe o escanea la guía" />
+              <!-- Botón más grande con ícono de QR azul -->
+              <button id="startScannerBtn" class="btn primary icon-btn" aria-label="Escanear código QR/Barras">
+                <!-- Icono SVG de código QR -->
+                <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24"><path fill="currentColor" d="M3 3h8v8H3V3m2 2v4h4V5H5m13 8h-2v2h2v-2m-2-2h-2v2h2v-2m2 4h-2v2h2v-2m2-2h-2v2h2v-2m-2 4h-2v2h2v-2M15 3h6v6h-6V3m2 2v2h2V5h-2m-8 6h2v2h-2v-2m-2 2H7v-2h2v2m-2-2h2v-2H7v2m-2 2h2v-2H5v2m16-4h-2v2h2v-2m-8 8h-2v2h2v-2m-2-2h-2v2h2v-2m-2 4h-2v2h2v-2M3 15h6v6H3v-6m2 2v2h2v-2zM15 15h2v2h-2v-2m-2 2h-2v2h2v-2m-2-2h-2v2h2v-2m2 4h-2v2h2v-2m2-2h-2v2h2v-2m2 4h-2v2h2v-2m-4-6h2v2h-2v-2m2 4h2v-2h-2v2M12 21h-2v-2h2v2m2-4h-2v-2h2v2m2-4h-2v-2h2v2m2-4h-2v-2h2v2M17 3v2h2V3h-2m-6 6h-2v2h2V9m-4 2h-2v2h2v-2m6-6h2v2h-2V5M5 11h2v2H5v-2m-2 2h2v2H3v-2m14 6h-2v2h2v-2m-6 0h-2v-2h2v2m-2-4h-2v-2h2v2m2-2h-2v2h2v-2M9 5h2v2H9V5M5 7h2v2H5V7m14-2v2h2V5h-2M7 15h2v2H7v-2M9 19h2v2H9v-2M5 17h2v2H5v-2M15 19h2v-2h-2v2m2-4h2v2h-2v-2m2-2h2v2h-2v-2m-2 4h-2v-2h2v2m-2 2h-2v-2h2v2"/></svg>
               </button>
             </div>
             <datalist id="guiaList"></datalist>
