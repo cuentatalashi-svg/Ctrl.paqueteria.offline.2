@@ -1,11 +1,11 @@
 {
   "name": "Control de Paquetería",
-  "short_name": "CtrlPaq",
+  "short_name": "Ctrl paqueteria",
   "description": "App para gestión y control de paquetería.",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#0b2545",
-  "theme_color": "#0b2545",
+  "background_color": "#0a360a",
+  "theme_color": "#0a360a",
   "orientation": "portrait-primary",
   "icons": [
     {
