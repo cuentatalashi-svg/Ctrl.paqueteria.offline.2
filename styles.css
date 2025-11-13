@@ -1,15 +1,16 @@
 /* styles.css final */
 :root{
-  --navy:#0b2545;
-  --blue-700:#113a66;
-  --blue-500:#2b6cb0;
-  --blue-300:#7fb0e7;
+  /* --- PALETA VERDE --- */
+  --green-dark:#0a360a; /* Oscuro para fondo principal / Header */
+  --green-700:#114e11; /* Oscuro intermedio para panel login */
+  --green-500:#28a745; /* Primario / Botones / Acentos */
+  --green-300:#7fd496; /* Acento claro para brillos / Login */
   --accent-red:#d9534f;
   
   /* --- INICIO NUEVA PALETA LOGIN --- */
-  --login-bg: #0b2545; /* Azul marino oscuro para fondo */
-  --login-panel-bg: #113a66; /* Azul más claro para panel info */
-  --login-accent: #7fb0e7; /* Acento celeste para bordes y brillos */
+  --login-bg: var(--green-dark); /* Verde oscuro para fondo */
+  --login-panel-bg: var(--green-700); /* Verde más oscuro para panel info */
+  --login-accent: var(--green-300); /* Acento verde claro para bordes y brillos */
   --login-text: #ffffff; /* Texto blanco */
   --login-muted: #e2e8f0; /* Texto/bordes atenuados */
   /* --- FIN NUEVA PALETA LOGIN --- */
@@ -54,7 +55,7 @@ body{
   margin-bottom: 20px;
 }
 .page-login .brand h1 {
-  color: var(--navy);
+  color: var(--green-dark); /* Ajuste de color */
 }
 .page-login .brand .subtitle {
   color: var(--muted);
@@ -75,7 +76,7 @@ body{
 
 
 /* header */
-.app-header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:linear-gradient(90deg,var(--navy),var(--blue-700));color:white}
+.app-header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:linear-gradient(90deg,var(--green-dark),var(--green-700));color:white}
 .brand-mini h1{margin:0;font-size:18px}
 .brand-mini .muted{font-size:13px;color:rgba(255,255,255,0.95)}
 
@@ -154,7 +155,7 @@ textarea{resize:vertical}
   cursor: pointer;
 }
 .btn.full{flex:1 1 100%;} /* Asegura que .full ocupe todo el ancho al apilarse */
-.btn.primary{background:var(--blue-500);color:white}
+.btn.primary{background:var(--green-500);color:white} /* Color primario VERDE */
 .btn.ghost{border:1px solid rgba(5,32,59,0.06);background:#fff; box-shadow: 0 1px 2px rgba(0,0,0,0.05);}
 
 /* --- INICIO NUEVOS BOTONES --- */
@@ -268,7 +269,7 @@ textarea{resize:vertical}
 
 /* --- ESTILOS MODAL VARIOS --- */
 #domicilioVariosTxt {
-  color: var(--navy);
+  color: var(--green-dark); /* Ajuste de color */
   font-weight: 600;
   display: block;
   margin-bottom: 8px;
@@ -308,7 +309,7 @@ textarea{resize:vertical}
 /* bottom nav */
 .bottom-nav{position:fixed;left:0;right:0;bottom:0;height:64px;background:white;border-top:1px solid #e6eefb;display:flex;justify-content:space-around;align-items:center;z-index:70}
 .nav-btn{background:transparent;border:0;padding:8px 12px;font-weight:700}
-.nav-btn.active{color:var(--blue-700)}
+.nav-btn.active{color:var(--green-700)} /* Color nav activo VERDE */
 
 /* table */
 .table{max-height:420px;overflow:auto;margin-top:8px}
@@ -322,7 +323,7 @@ textarea{resize:vertical}
 /* INICIO MODIFICACIÓN: Estilo para tel en tabla directorio */
 .table .info .telefono {
   font-size: 13px;
-  color: var(--blue-700);
+  color: var(--green-700); /* Ajuste de color */
   font-weight: 500;
   margin-top: 4px;
 }
@@ -348,7 +349,7 @@ textarea{resize:vertical}
   border-bottom: 1px solid #f1f5f9;
 }
 .historial-card .card-header strong {
-  color: var(--navy);
+  color: var(--green-dark); /* Ajuste de color */
   font-size: 16px;
   display: block;
   margin-bottom: 2px;
@@ -381,7 +382,7 @@ textarea{resize:vertical}
   border-radius: 6px;
   font-style: italic;
   color: #334155;
-  border-left: 3px solid var(--blue-300);
+  border-left: 3px solid var(--green-300); /* Ajuste de color */
 }
 .historial-card .trazabilidad {
   display: flex;
@@ -495,7 +496,7 @@ textarea{resize:vertical}
 }
 .radio-group input[type="radio"] {
   width: auto; /* Ancho natural */
-  accent-color: var(--blue-500); /* Color del check */
+  accent-color: var(--green-500); /* Color del check VERDE */
 }
 /* --- FIN NUEVO ESTILO RADIO BUTTONS --- */
 
@@ -566,7 +567,7 @@ textarea{resize:vertical}
 
 /* Cuando una fecha es seleccionada, el span se ve diferente */
 .date-picker-btn.has-value span {
-  color: var(--blue-700);
+  color: var(--green-700); /* Ajuste de color */
   font-weight: 600;
 }
 /* ****** FIN NUEVOS ESTILOS DE FILTRO ****** */
@@ -599,7 +600,7 @@ textarea{resize:vertical}
 .hidden{display:none}
 
 
-/* --- INICIO ESTILOS LOGIN/REGISTER ANIMADO (Paleta Azul) --- */
+/* --- INICIO ESTILOS LOGIN/REGISTER ANIMADO (Paleta Verde) --- */
 
 /* Fondo de la página de login */
 .page-login {
@@ -614,10 +615,10 @@ textarea{resize:vertical}
   max-width: 100%; /* Para que no se desborde en móviles */
   /* height: 480px; -> CAMBIO: Altura flexible */
   min-height: 480px;
-  background: var(--login-bg); /* Fondo marino oscuro */
-  border: 2px solid var(--login-accent); /* Borde celeste */
+  background: var(--login-bg); /* Fondo verde oscuro */
+  border: 2px solid var(--login-accent); /* Borde verde claro */
   overflow: hidden; /* Clave para la animación */
-  box-shadow: 0 0 25px var(--login-accent); /* Brillo celeste */
+  box-shadow: 0 0 25px var(--login-accent); /* Brillo verde claro */
   margin: 20px auto; /* Centrar el wrapper */
   border-radius: var(--card-radius);
   color: var(--login-text); /* Texto blanco por defecto */
@@ -687,7 +688,7 @@ textarea{resize:vertical}
 
 /* --- BOTÓN PRIMARIO (Redondeado y centrado) --- */
 .wrapper .btn.primary {
-  background: linear-gradient(90deg, var(--blue-500), var(--login-accent));
+  background: linear-gradient(90deg, var(--green-500), var(--login-accent)); /* Ajuste de color VERDE */
   border-radius: 25px; /* Botón redondeado */
   border: none;
   box-shadow: 0 0 10px rgba(127, 176, 231, 0.5); /* Brillo sutil */
@@ -716,7 +717,7 @@ textarea{resize:vertical}
 .wrapper .form-box .login-register-link .btn-link {
   background: none;
   border: none;
-  color: var(--login-accent); /* Color acento */
+  color: var(--login-accent); /* Color acento VERDE */
   font-weight: 600;
   cursor: pointer;
   padding: 0 4px;
@@ -804,14 +805,14 @@ textarea{resize:vertical}
 .foot-legal .btn-link {
   background: none;
   border: none;
-  color: var(--blue-500); /* Azul estándar de la app */
+  color: var(--green-500); /* Verde estándar de la app */
   font-weight: 600;
   cursor: pointer;
   font-size: 12px;
   text-decoration: underline;
 }
 .foot-legal .btn-link:hover {
-  color: var(--navy);
+  color: var(--green-dark); /* Ajuste de color */
 }
 
 /* Asegurar que el modal de privacidad se vea bien en la pág de login */
@@ -832,6 +833,44 @@ textarea{resize:vertical}
 }
 /* --- FIN ESTILOS FOOTER Y PRIVACIDAD --- */
 
+/* --- INICIO ESTILOS CAMPO GUÍA Y BOTÓN ESCÁNER --- */
+.field-with-button {
+    display: flex;
+    align-items: center;
+    gap: 0;
+}
+/* Quitar borde redondeado derecho al input de guía */
+.field-with-button input {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    flex-grow: 1;
+}
+/* Estilo para el botón del escáner */
+.field-with-button .icon-btn {
+    /* Hacerlo más grande y de color azul */
+    background: #5078f2; /* Azul para el QR */
+    color: white;
+    padding: 10px; /* Ajuste para que se vea cuadrado */
+    height: 40px; 
+    width: 40px; 
+    border-radius: 0 8px 8px 0; /* Borde redondeado solo a la derecha */
+    flex-shrink: 0; /* Evitar que se encoja */
+    /* Estilo de QR */
+    border: none;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    /* Ajuste del icono SVG para que se centre */
+    display: grid; 
+    place-items: center;
+    font-size: 0; /* Ocultar font-size de btn para usar solo svg */
+}
+.field-with-button .icon-btn:hover {
+    background: #3b5fde; /* Azul más oscuro al pasar el ratón */
+}
+.field-with-button .icon-btn svg {
+    width: 24px; /* Tamaño del QR */
+    height: 24px;
+}
+/* --- FIN ESTILOS CAMPO GUÍA Y BOTÓN ESCÁNER --- */
 
 }
 
