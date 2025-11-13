@@ -1,6 +1,6 @@
 // Nombre del caché (cámbialo SIEMPRE si actualizas los archivos principales)
-// ★★★ CAMBIO: Incremento la versión del caché a v4 para forzar la recarga de CDN. ★★★
-const CACHE_NAME = 'ctrl-paq-cache-v4';
+// ★★★ CAMBIO: Incremento la versión del caché a v5 y actualizo URLs a locales ★★★
+const CACHE_NAME = 'ctrl-paq-cache-v5';
 
 // "App Shell" - Archivos necesarios para que la app funcione offline
 const urlsToCache = [
@@ -14,13 +14,14 @@ const urlsToCache = [
   '/icon-192.svg',
   '/icon-512.svg',
   '/manifest.webmanifest',
+  // ★★★ AÑADIDO: Librerías PDF locales para asegurar la disponibilidad ★★★
+  '/jspdf.umd.js',
+  '/jspdf.plugin.autotable.js',
 ];
 
 // URLs que siempre deben cargarse desde la red (Librerías externas)
-const externalUrls = [
-  'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js'
-];
+// ★★★ ELIMINADO: Se quitan las referencias CDN ya que se usa la versión local ★★★
+const externalUrls = [];
 
 // Evento "install": se dispara cuando el SW se instala
 self.addEventListener('install', event => {
@@ -30,8 +31,8 @@ self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
-        console.log('[SW] Abriendo caché y guardando app shell y librerías CDN');
-        // Cachear archivos locales Y las librerías CDN
+        console.log('[SW] Abriendo caché y guardando app shell y librerías');
+        // Cachear archivos locales Y las librerías CDN (ahora urlsToCache incluye las locales)
         return cache.addAll(urlsToCache.concat(externalUrls));
       })
       .then(() => self.skipWaiting()) // Forzar al SW a activarse
@@ -83,7 +84,7 @@ function staleWhileRevalidate(request) {
   });
 }
 
-// Estrategia: Cache First para librerías CDN (lo que soluciona tu problema con jsPDF)
+// Estrategia: Cache First para librerías CDN (ya no se usa, pero se mantiene la función genérica)
 function cacheFirst(request) {
     return caches.match(request).then(cachedResponse => {
         // Devuelve la respuesta del caché inmediatamente si existe
@@ -111,6 +112,7 @@ function cacheFirst(request) {
 // Evento "fetch": se dispara cada vez que la app pide un recurso
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
+  // ★★★ CAMBIO: Ahora todos los archivos de la app son locales, usamos siempre Stale While Revalidate ★★★
   const isLocalFile = url.origin === location.origin && urlsToCache.some(u => url.pathname.endsWith(u.replace('/', '')));
   const isExternalLibrary = externalUrls.includes(event.request.url);
 
@@ -118,22 +120,17 @@ self.addEventListener('fetch', event => {
     return;
   }
   
-  // 1. Archivos locales (App Shell) - Usar Stale While Revalidate
-  if (isLocalFile) {
+  // 1. Archivos de la aplicación (incluyendo los nuevos PDF locales) - Usar Stale While Revalidate
+  if (isLocalFile || isExternalLibrary) {
     event.respondWith(staleWhileRevalidate(event.request));
     return;
   }
   
-  // 2. Librerías externas (jsPDF) - Usar Cache First
-  if (isExternalLibrary) {
-     event.respondWith(cacheFirst(event.request));
-     return;
-  }
-
-  // 3. Otros (Imágenes dinámicas, etc.) - Solo red con fallback a caché
+  // 2. Otros (Imágenes dinámicas, etc.) - Solo red con fallback a caché
   event.respondWith(fetch(event.request).catch(error => {
       console.error('[SW] Fallo de red:', error, event.request.url);
       return caches.match(event.request); 
   }));
 });
+
 
