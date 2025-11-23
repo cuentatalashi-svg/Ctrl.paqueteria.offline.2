@@ -303,6 +303,12 @@
   <!-- Scripts de la App -->
   <!-- ★★★ CAMBIO: Usar archivos locales en lugar de CDN ★★★ -->
   <script src="jspdf.umd.js"></script>
+  <!-- ★★★ FIX CRÍTICO PARA JSPDF: Shim para que el plugin autotable encuentre jsPDF ★★★ -->
+  <script>
+    if (window.jspdf && window.jspdf.jsPDF) {
+      window.jsPDF = window.jspdf.jsPDF;
+    }
+  </script>
   <script src="jspdf.plugin.autotable.js"></script>
   
   <!-- Librería de escáner (ZXing) -->
@@ -312,5 +318,4 @@
   <script src="app.js"></script>
 </body>
 </html>
-
 
