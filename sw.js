@@ -1,8 +1,7 @@
 // Nombre del caché (cámbialo SIEMPRE si actualizas los archivos principales)
-// ★★★ CAMBIO: Incremento la versión a v7 para purgar cualquier error previo ★★★
-const CACHE_NAME = 'ctrl-paq-cache-v7';
+// ★★★ CAMBIO: Incremento a v8 para forzar la actualización del arreglo de PDF ★★★
+const CACHE_NAME = 'ctrl-paq-cache-v8';
 
-// "App Shell" - Archivos necesarios para que la app funcione offline
 const urlsToCache = [
   '/',
   '/index.html',
@@ -21,27 +20,27 @@ const urlsToCache = [
 const externalUrls = [];
 
 self.addEventListener('install', event => {
-  console.log('[SW] Instalando v7...');
+  console.log('[SW] Instalando v8...');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
-        console.log('[SW] Abriendo caché v7 y guardando todo');
+        console.log('[SW] Cacheando archivos v8');
         return cache.addAll(urlsToCache.concat(externalUrls));
       })
       .then(() => self.skipWaiting())
-      .catch(err => console.error('[SW] Fallo crítico al precachear:', err))
+      .catch(err => console.error('[SW] Error precache:', err))
   );
 });
 
 self.addEventListener('activate', event => {
-  console.log('[SW] Activado v7.');
+  console.log('[SW] Activado v8.');
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
         cacheNames.filter(cacheName => {
           return cacheName.startsWith('ctrl-paq-cache-') && cacheName !== CACHE_NAME;
         }).map(cacheName => {
-          console.log(`[SW] Borrando caché antiguo: ${cacheName}`);
+          console.log(`[SW] Borrando caché viejo: ${cacheName}`);
           return caches.delete(cacheName);
         })
       );
@@ -58,7 +57,7 @@ function staleWhileRevalidate(request) {
         }
         return response;
       }).catch(error => {
-        console.error('[SW] Fallo red:', error, request.url);
+        console.error('[SW] Fallo red:', error);
         throw error; 
       });
       return cachedResponse || networkFetch;
@@ -67,18 +66,15 @@ function staleWhileRevalidate(request) {
 }
 
 self.addEventListener('fetch', event => {
-  const url = new URL(event.request.url);
-  const isLocalFile = url.origin === location.origin && urlsToCache.some(u => url.pathname.endsWith(u.replace('/', '')));
-  const isExternalLibrary = externalUrls.includes(event.request.url);
-
   if (event.request.method !== 'GET') return;
+  const url = new URL(event.request.url);
+  const isLocal = url.origin === location.origin && urlsToCache.some(u => url.pathname.endsWith(u.replace('/', '')));
   
-  if (isLocalFile || isExternalLibrary) {
+  if (isLocal || externalUrls.includes(event.request.url)) {
     event.respondWith(staleWhileRevalidate(event.request));
-    return;
+  } else {
+    event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
   }
-  
-  event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
 });
 
 
