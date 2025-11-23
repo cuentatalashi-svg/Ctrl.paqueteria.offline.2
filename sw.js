@@ -1,6 +1,6 @@
 // Nombre del caché (cámbialo SIEMPRE si actualizas los archivos principales)
-// ★★★ CAMBIO: Incremento la versión del caché a v6 para forzar la actualización de los bugs arreglados ★★★
-const CACHE_NAME = 'ctrl-paq-cache-v6';
+// ★★★ CAMBIO: Incremento la versión a v7 para purgar cualquier error previo ★★★
+const CACHE_NAME = 'ctrl-paq-cache-v7';
 
 // "App Shell" - Archivos necesarios para que la app funcione offline
 const urlsToCache = [
@@ -14,94 +14,71 @@ const urlsToCache = [
   '/icon-192.svg',
   '/icon-512.svg',
   '/manifest.webmanifest',
-  // Librerías PDF locales
   '/jspdf.umd.js',
   '/jspdf.plugin.autotable.js',
 ];
 
-// URLs que siempre deben cargarse desde la red (Librerías externas)
 const externalUrls = [];
 
-// Evento "install": se dispara cuando el SW se instala
 self.addEventListener('install', event => {
-  console.log('[SW] Instalando v6...');
-  // GUARANTEE: Se espera a que TODOS los archivos esenciales se guarden en caché.
+  console.log('[SW] Instalando v7...');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
-        console.log('[SW] Abriendo caché v6 y guardando app shell');
+        console.log('[SW] Abriendo caché v7 y guardando todo');
         return cache.addAll(urlsToCache.concat(externalUrls));
       })
-      .then(() => self.skipWaiting()) // Forzar al SW a activarse
+      .then(() => self.skipWaiting())
       .catch(err => console.error('[SW] Fallo crítico al precachear:', err))
   );
 });
 
-// Evento "activate": se dispara cuando el SW se activa (limpia cachés viejos)
 self.addEventListener('activate', event => {
-  console.log('[SW] Activado v6.');
-  // GUARANTEE: Se borran cachés antiguos para ahorrar espacio y asegurar que no se sirvan archivos viejos.
+  console.log('[SW] Activado v7.');
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
         cacheNames.filter(cacheName => {
-          // Borrar todos los cachés que no sean el actual (v6)
           return cacheName.startsWith('ctrl-paq-cache-') && cacheName !== CACHE_NAME;
         }).map(cacheName => {
           console.log(`[SW] Borrando caché antiguo: ${cacheName}`);
           return caches.delete(cacheName);
         })
       );
-    }).then(() => self.clients.claim()) // Tomar control inmediato de las páginas
+    }).then(() => self.clients.claim())
   );
 });
 
-// Estrategia: Stale While Revalidate para archivos locales
-// Sirve el caché inmediatamente y actualiza el caché en segundo plano.
 function staleWhileRevalidate(request) {
   return caches.open(CACHE_NAME).then(cache => {
     return cache.match(request).then(cachedResponse => {
-      // 1. Siempre devuelve la versión en caché inmediatamente si existe.
       const networkFetch = fetch(request).then(response => {
-        // Almacena la nueva versión en caché para la próxima vez
         if (response && response.status === 200 && request.method === 'GET') {
           cache.put(request, response.clone());
         }
         return response;
       }).catch(error => {
-        console.error('[SW] Fallo al revalidar desde la red:', error, request.url);
+        console.error('[SW] Fallo red:', error, request.url);
         throw error; 
       });
-
-      // 2. Si hay una respuesta en caché, la devuelve de inmediato.
-      // Si no hay caché, espera la respuesta de red.
       return cachedResponse || networkFetch;
     });
   });
 }
 
-// Evento "fetch": se dispara cada vez que la app pide un recurso
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
-  
-  // Verificar si es un archivo local de nuestra lista
   const isLocalFile = url.origin === location.origin && urlsToCache.some(u => url.pathname.endsWith(u.replace('/', '')));
   const isExternalLibrary = externalUrls.includes(event.request.url);
 
-  if (event.request.method !== 'GET') {
-    return;
-  }
+  if (event.request.method !== 'GET') return;
   
-  // 1. Archivos de la aplicación - Usar Stale While Revalidate
   if (isLocalFile || isExternalLibrary) {
     event.respondWith(staleWhileRevalidate(event.request));
     return;
   }
   
-  // 2. Otros (Imágenes dinámicas, etc.) - Solo red con fallback a caché
-  event.respondWith(fetch(event.request).catch(error => {
-      console.error('[SW] Fallo de red:', error, event.request.url);
-      return caches.match(event.request); 
-  }));
+  event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
 });
+
 
