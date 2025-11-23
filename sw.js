@@ -1,6 +1,6 @@
 // Nombre del caché (cámbialo SIEMPRE si actualizas los archivos principales)
-// ★★★ CAMBIO: Incremento a v8 para forzar la actualización del arreglo de PDF ★★★
-const CACHE_NAME = 'ctrl-paq-cache-v8';
+// ★★★ CAMBIO: v9 para purgar cualquier error persistente ★★★
+const CACHE_NAME = 'ctrl-paq-cache-v9';
 
 const urlsToCache = [
   '/',
@@ -20,29 +20,23 @@ const urlsToCache = [
 const externalUrls = [];
 
 self.addEventListener('install', event => {
-  console.log('[SW] Instalando v8...');
+  console.log('[SW] Instalando v9...');
+  self.skipWaiting(); // Forzar activación inmediata
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('[SW] Cacheando archivos v8');
-        return cache.addAll(urlsToCache.concat(externalUrls));
-      })
-      .then(() => self.skipWaiting())
+      .then(cache => cache.addAll(urlsToCache.concat(externalUrls)))
       .catch(err => console.error('[SW] Error precache:', err))
   );
 });
 
 self.addEventListener('activate', event => {
-  console.log('[SW] Activado v8.');
+  console.log('[SW] Activado v9. Limpiando viejos...');
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
         cacheNames.filter(cacheName => {
           return cacheName.startsWith('ctrl-paq-cache-') && cacheName !== CACHE_NAME;
-        }).map(cacheName => {
-          console.log(`[SW] Borrando caché viejo: ${cacheName}`);
-          return caches.delete(cacheName);
-        })
+        }).map(cacheName => caches.delete(cacheName))
       );
     }).then(() => self.clients.claim())
   );
@@ -56,9 +50,10 @@ function staleWhileRevalidate(request) {
           cache.put(request, response.clone());
         }
         return response;
-      }).catch(error => {
-        console.error('[SW] Fallo red:', error);
-        throw error; 
+      }).catch(err => {
+        // Si falla red y no hay caché, error
+        console.error('[SW] Fallo red:', err);
+        throw err; 
       });
       return cachedResponse || networkFetch;
     });
@@ -67,14 +62,11 @@ function staleWhileRevalidate(request) {
 
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
-  const url = new URL(event.request.url);
-  const isLocal = url.origin === location.origin && urlsToCache.some(u => url.pathname.endsWith(u.replace('/', '')));
   
-  if (isLocal || externalUrls.includes(event.request.url)) {
-    event.respondWith(staleWhileRevalidate(event.request));
-  } else {
-    event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
-  }
+  // Estrategia especial para scripts críticos: Network First si es posible para asegurar versión nueva
+  // Pero mantenemos StaleWhileRevalidate para velocidad offline.
+  // Con v9 y el botón de reset, esto se arreglará.
+  event.respondWith(staleWhileRevalidate(event.request));
 });
 
 
