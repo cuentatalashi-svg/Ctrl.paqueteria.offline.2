@@ -1,4 +1,4 @@
-/* app.js final: +FIX PDF +RESET BUTTON +SW v9 */
+/* app.js final: +RESTORED SEARCH +RESTORED FILTERING +RESTORED PHOTOS +FIXED PDF */
 (async function(){
   
   // REGISTRO SW
@@ -8,11 +8,11 @@
 
   // RE-CHECK PDF AL INICIO
   let jsPDF = window.jsPDF || (window.jspdf && window.jspdf.jsPDF);
-  if(jsPDF) window.jsPDF = jsPDF; // Asegurar global
+  if(jsPDF) window.jsPDF = jsPDF;
 
   await openDB();
 
-  // --- Helpers (Banner, Hash, File, Compress) ---
+  // --- Helpers ---
   async function createBannerImage(text) {
     return new Promise((resolve) => {
       const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
@@ -100,7 +100,7 @@
     document.getElementById('logoutBtn').onclick = ()=>{ localStorage.removeItem('ctrl_user'); location.href='index.html'; };
     if(user.rol === 'admin') document.getElementById('nav-btn-admin').classList.remove('hidden');
 
-    // Navegación
+    // Navigation
     const container = document.getElementById('app-main-container');
     const navBtns = document.querySelectorAll('.nav-btn');
     const showScreen = async (id) => {
@@ -123,52 +123,32 @@
        if(type!=='loading') toastTimer = setTimeout(()=>toast.classList.remove('show'), dur);
     };
 
-    // --- NUEVO: BOTÓN DE REPARACIÓN NUCLEAR ---
+    // BOTÓN DE REPARACIÓN
     document.getElementById('forceUpdateBtn').onclick = async () => {
-        if(!confirm("¿Esto recargará la aplicación y forzará la actualización para corregir errores. ¿Continuar?")) return;
+        if(!confirm("¿Recargar y reparar?")) return;
         showMessage("Reparando...", "loading", 0);
-        
-        // 1. Desregistrar SW
         if ('serviceWorker' in navigator) {
-            const registrations = await navigator.serviceWorker.getRegistrations();
-            for(let registration of registrations) {
-                await registration.unregister();
-            }
+            const regs = await navigator.serviceWorker.getRegistrations();
+            for(let r of regs) await r.unregister();
         }
-        
-        // 2. Limpiar cache storage
         const keys = await caches.keys();
         await Promise.all(keys.map(key => caches.delete(key)));
-        
-        // 3. Forzar recarga del servidor
-        setTimeout(() => {
-            window.location.reload(true);
-        }, 1000);
+        setTimeout(() => window.location.reload(true), 1000);
     };
 
-    // --- PDF GENERATION ---
+    // PDF GENERATION
     document.getElementById('downloadPdfBtn').onclick = async () => {
       if(user.rol !== 'admin') return;
-      
       const PDFLib = window.jsPDF || (window.jspdf && window.jspdf.jsPDF);
       if(!PDFLib) return showMessage('Error: jsPDF no cargado', 'error');
 
       showMessage('Generando PDF...', 'loading', 0);
       try {
         const doc = new PDFLib();
-        
-        // Comprobación
-        if(typeof doc.autoTable !== 'function') {
-           console.warn("Intento de fix manual...");
-           // Si existe en window.jspdf.plugin.autotable, intenta asignarlo al doc
-           if (window.jspdf && window.jspdf.plugin && window.jspdf.plugin.autotable) {
-               // Algunos plugins necesitan llamada manual
-           }
-           throw new Error("Plugin AutoTable no disponible. Por favor, usa el botón 'FORZAR ACTUALIZACIÓN' arriba y reintenta.");
-        }
+        if(typeof doc.autoTable !== 'function') throw new Error("AutoTable faltante. Usa 'FORZAR ACTUALIZACIÓN'.");
 
         doc.setFontSize(18); doc.text('Reporte Paquetería', 14, 22);
-        doc.setFontSize(12); doc.text(`Generado por: ${user.nombre} - ${new Date().toLocaleString()}`, 14, 30);
+        doc.setFontSize(12); doc.text(`Generado por: ${user.nombre}`, 14, 30);
 
         const all = await getAll('paquetes');
         const caseta = all.filter(p => p.estado === 'en_caseta');
@@ -179,7 +159,6 @@
           body: caseta.map(p => [p.guia, p.domicilio, p.nombre, new Date(p.created).toLocaleDateString()]),
           headStyles: { fillColor: [10, 54, 10] }
         });
-        
         doc.text('Entregados Recientes', 14, doc.lastAutoTable.finalY + 10);
         doc.autoTable({
           startY: doc.lastAutoTable.finalY + 15,
@@ -187,16 +166,14 @@
           body: ent.map(p => [p.guia, p.domicilio, p.nombre, new Date(p.entregadoEn).toLocaleDateString()]),
           headStyles: { fillColor: [40, 167, 69] }
         });
-
         doc.save(`Reporte_${Date.now()}.pdf`);
         showMessage('PDF Generado', 'success');
       } catch (e) { 
-        alert("Error PDF: " + e.message); 
-        showMessage('Fallo al generar PDF', 'error'); 
+        alert("Error PDF: " + e.message); showMessage('Fallo PDF', 'error'); 
       }
     };
 
-    // Core Logic
+    // --- CORE LOGIC (RESTAURADA) ---
     const refreshDomicilios = async () => {
        const doms = await getAll('domicilios');
        document.getElementById('tablaDomicilios').innerHTML = doms.map(d => 
@@ -206,26 +183,57 @@
     };
     window.editDom = async (id) => { const d = await getByKey('domicilios', id); if(d) { document.getElementById('domCalle').value=d.calle; document.getElementById('domTelefono').value=d.telefono; } };
 
+    // ★★★ LÓGICA DE BÚSQUEDA RESTAURADA ★★★
+    const buscarHist = document.getElementById('buscarHist');
+    const filtroEstado = document.getElementById('filtroEstado');
+    const fechaDesde = document.getElementById('fechaDesde');
+    const fechaHasta = document.getElementById('fechaHasta');
+
     const refreshPaquetes = async () => {
        const all = await getAll('paquetes');
-       const rows = all.sort((a,b)=>b.created-a.created);
+       const filter = buscarHist.value.toLowerCase(); 
+       const estado = filtroEstado.value;
+       const d1 = fechaDesde.valueAsDate; 
+       const d2 = fechaHasta.valueAsDate;
+
+       // Filtrado real
+       const rows = all.filter(p => {
+           if (filter && !((p.guia||'').toLowerCase().includes(filter) || (p.nombre||'').toLowerCase().includes(filter) || (p.domicilio||'').toLowerCase().includes(filter))) return false;
+           if (estado && p.estado !== estado) return false;
+           const d = new Date(p.created);
+           if (d1 && d < d1) return false;
+           if (d2) { const n = new Date(d2); n.setDate(n.getDate()+1); if (d >= n) return false; }
+           return true;
+       }).sort((a,b)=>b.created-a.created);
+
        document.getElementById('historialPaquetes').innerHTML = rows.map(p => 
          `<div class="historial-card estado-${p.estado}"><div class="card-header"><strong>${p.domicilio}</strong> <span>${p.guia}</span></div><div class="card-body"><span class="estado-tag">${p.estado}</span> <small>${new Date(p.created).toLocaleDateString()}</small></div><div class="card-footer"><button class="btn ghost" onclick="viewP(${p.id})">Ver</button></div></div>`
        ).join('');
        document.getElementById('historialContador').textContent = `Total: ${rows.length}`;
     };
+    
+    // Event Listeners de Búsqueda
+    buscarHist.oninput = refreshPaquetes;
+    filtroEstado.onchange = refreshPaquetes;
+    fechaDesde.onchange = refreshPaquetes;
+    fechaHasta.onchange = refreshPaquetes;
+
     window.viewP = async (id) => { const p = await getByKey('paquetes', id); if(p.foto) { document.getElementById('viewerImg').src=p.foto; document.getElementById('imageViewer').classList.remove('hidden'); } };
     document.getElementById('closeImageViewer').onclick = () => document.getElementById('imageViewer').classList.add('hidden');
 
-    // Recibir
-    const guiaEl = document.getElementById('guia'); const domInput = document.getElementById('domicilioInput');
+    // Recibir Logic
     document.getElementById('recibirBtn').onclick = async () => {
        const guia = guiaEl.value.trim(); const dom = domInput.value.trim(); const nom = document.getElementById('nombreDest').value.trim();
        const foto = document.getElementById('fotoInput').files[0];
-       if(!guia || !dom || !nom || !foto) return showMessage('Faltan datos', 'error');
+       // Si no hay foto nueva, ver si hay una en preview (por si el usuario la tomó antes)
+       const fotoPreviewSrc = document.getElementById('fotoPreview').querySelector('img')?.src;
+       
+       if(!guia || !dom || !nom) return showMessage('Faltan datos', 'error');
+       if(!foto && !fotoPreviewSrc) return showMessage('Foto obligatoria', 'error');
        
        showMessage('Guardando...', 'loading', 0);
-       const fData = await compressImage(foto);
+       const fData = foto ? await compressImage(foto) : fotoPreviewSrc;
+       
        await addItem('paquetes', { guia, nombre:nom, domicilio:dom, foto:fData, estado:'en_caseta', created:Date.now(), recibidoPor:user.nombre, paqueteria:document.getElementById('paqueteriaInput').value });
        
        if(document.getElementById('notificarSi').checked){
@@ -238,10 +246,14 @@
            if(!s && navigator.canShare && navigator.canShare({text:msg})) { try{await navigator.share({text:msg}); s=true;}catch(e){} }
            if(!s && dInfo?.telefono) window.open(`https://wa.me/${dInfo.telefono}?text=${encodeURIComponent(msg)}`, '_blank');
        }
-       showMessage('Guardado', 'success'); guiaEl.value=''; domInput.value=''; document.getElementById('fotoPreview').innerHTML=''; refreshPaquetes();
+       showMessage('Guardado', 'success'); 
+       guiaEl.value=''; document.getElementById('nombreDest').value=''; 
+       document.getElementById('paqueteriaInput').value=''; domInput.value=''; 
+       document.getElementById('fotoPreview').innerHTML=''; document.getElementById('fotoInput').value = '';
+       refreshPaquetes();
     };
 
-    // Entregar (Simplificado)
+    // Entregar
     document.getElementById('entregarBtn').onclick = async () => {
       const guia = guiaEl.value.trim(); if(!guia) return showMessage('Falta guía', 'error');
       const p = (await getAll('paquetes')).find(x => x.guia === guia);
@@ -256,7 +268,6 @@
     document.getElementById('cancelEntregarBtn').onclick = () => document.getElementById('confirmEntregarModal').classList.add('hidden');
 
     document.getElementById('guardarFirma').onclick = async () => {
-      // (Firma logic here - uses canvas)
       const firmaUrl = document.getElementById('firmaCanvas').toDataURL();
       const p = (await getAll('paquetes')).find(x => x.guia === guiaEl.value.trim());
       if(p) {
@@ -268,7 +279,31 @@
       }
     };
 
+    // Init
     await refreshDomicilios(); await refreshPaquetes();
+    
+    // Scanner
+    document.getElementById('startScannerBtn').onclick = async () => {
+      const modal = document.getElementById('scannerModal');
+      const video = document.getElementById('scanner-video');
+      modal.classList.remove('hidden');
+      try {
+         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+         video.srcObject = stream; video.play();
+         if(window.BarcodeDetector) {
+            const bd = new BarcodeDetector();
+            const loop = async () => {
+               if(modal.classList.contains('hidden')) return;
+               try { const res = await bd.detect(video); if(res.length){ guiaEl.value=res[0].rawValue; document.getElementById('stopScannerBtn').click(); }} catch(e){}
+               requestAnimationFrame(loop);
+            }; loop();
+         }
+      } catch(e) { alert(e); modal.classList.add('hidden'); }
+    };
+    document.getElementById('stopScannerBtn').onclick = () => {
+       const v = document.getElementById('scanner-video'); if(v.srcObject) v.srcObject.getTracks().forEach(t=>t.stop());
+       document.getElementById('scannerModal').classList.add('hidden');
+    };
   }
 })();
 
