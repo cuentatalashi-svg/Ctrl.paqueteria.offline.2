@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>ctrl-paqueteria — App</title>
+  <title>ctrl-paqueteria v9</title>
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="theme-color" content="#0a360a"> 
   <link rel="apple-touch-icon" href="icon-192.svg">
@@ -37,7 +37,7 @@
   </style>
 </head>
 <body class="page-main">
-  <header class="app-header"><div class="brand-mini"><h1>ctrl-paqueteria</h1><div id="saludo" class="muted">Buen turno</div></div><div><button id="logoutBtn" class="btn ghost">Salir</button></div></header>
+  <header class="app-header"><div class="brand-mini"><h1>ctrl-paqueteria v9</h1><div id="saludo" class="muted"></div></div><div><button id="logoutBtn" class="btn ghost">Salir</button></div></header>
 
   <main id="app-main-container" class="app-main container show-paqueteria">
     <div class="screens-wrapper">
@@ -83,6 +83,10 @@
       <!-- Admin -->
       <section id="screen-admin" class="screen card">
         <h3>Admin 🛡️</h3>
+        <div class="block">
+            <h4>Diagnóstico</h4>
+            <button id="forceUpdateBtn" class="btn danger full" style="margin-bottom:15px; border: 2px solid red;">⚠️ FORZAR ACTUALIZACIÓN / REPARAR</button>
+        </div>
         <div class="block"><button id="downloadPdfBtn" class="btn primary full">Descargar Reporte PDF</button></div>
         <div class="block"><button id="exportBackupBtn" class="btn ghost full">Respaldo JSON</button>
         <input type="file" id="restoreBackupInput" style="display:none" /><button id="restoreBackupBtn" class="btn danger full" style="margin-top:10px">Restaurar</button></div>
@@ -113,10 +117,11 @@
   <!-- SCRIPTS: ORDEN CRÍTICO PARA PDF -->
   <script src="jspdf.umd.js"></script>
   <script>
-    // ★★★ FIX DEFINITIVO: ASIGNACIÓN AGRESIVA ★★★
-    // Esto asegura que window.jsPDF exista ANTES de que el plugin autotable intente usarlo.
-    window.jsPDF = window.jspdf ? window.jspdf.jsPDF : window.jsPDF;
-    console.log("Estado jsPDF cargado:", !!window.jsPDF);
+    // ★★★ FIX: SHIM MANUAL ★★★
+    // Si jsPDF existe en namespace 'jspdf', lo movemos a window.jsPDF para que el plugin lo encuentre
+    if (window.jspdf && window.jspdf.jsPDF) {
+      window.jsPDF = window.jspdf.jsPDF;
+    }
   </script>
   <script src="jspdf.plugin.autotable.js"></script>
   
