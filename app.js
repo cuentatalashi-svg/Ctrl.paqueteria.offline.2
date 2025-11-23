@@ -1,4 +1,4 @@
-/* app.js final: +Foto Guardia +Comentarios +Opcion Notificar +Historial Cards +COMPRESION + TOAST + RESPALDO + ZXING / BarcodeDetector + QR (Modo "Scan-All") + FIX LOGIN HASH + FIX BUGS + PWA + FIX SHARE ANDROID v7 (Quitar Title) + FIX DOMICILIO EXACTO + FIX JPDF + FIX NOTIFICACION DUPLICADA */
+/* app.js final: +FIX SHARE DUPLICADO +FIX JSPDF +FIX MODAL INTRUSIVO +Foto Guardia +Comentarios +Opcion Notificar +Historial Cards +COMPRESION + TOAST + RESPALDO + ZXING / BarcodeDetector + QR (Modo "Scan-All") + PWA */
 (async function(){
   
   // --- INICIO REGISTRO PWA SERVICE WORKER ---
@@ -17,11 +17,10 @@
 
   // --- INICIO SETUP DE jspdf ---
   let jsPDF;
-  // ★★★ CAMBIO: Ahora que las librerías son locales (umd), la clase debería estar disponible en window.jspdf.jsPDF ★★★
+  // Aseguramos que se use la versión correcta, ya sea del UMD o del shim
   if(window.jspdf && window.jspdf.jsPDF) {
     jsPDF = window.jspdf.jsPDF;
   } else if (typeof window.jsPDF === 'function') {
-    // Si la versión antigua de UMD se registró directamente en window
     jsPDF = window.jsPDF;
   }
   // --- FIN SETUP ---
@@ -182,7 +181,7 @@
   // MAIN SPA
   if(document.body.classList.contains('page-main')){
     
-    // ★★★ CORRECCIÓN: Se movió la verificación de jsPDF para que solo deshabilite el botón. ★★★
+    // ★★★ FIX JSPDF: Ya no debería fallar gracias al shim en main.html, pero dejamos la advertencia por seguridad ★★★
     if (!jsPDF) {
       console.warn("jsPDF no se cargó correctamente. El botón de PDF estará deshabilitado.");
       const pdfBtn = document.getElementById('downloadPdfBtn');
@@ -524,14 +523,15 @@
       }
     });
 
-    // --- Lógica de entrega múltiple (CORREGIDA para coincidencia EXACTA) ---
+    // --- Lógica de entrega múltiple (CORREGIDA para coincidencia EXACTA y UX) ---
     const handleDomicilioInput = async () => {
       const dom = domicilioInput.value.trim();
       const domLower = dom.toLowerCase();
       
-      // La búsqueda de entrega múltiple solo aplica si no hay guía
-      if (!dom || guiaEl.value.trim().length > 0) { 
-          // Ocultar modal si no hay domicilio o si se empezó a escribir una guía
+      // ★★★ FIX MODAL INTRUSIVO: Si el usuario está escribiendo la guía, nombre o paquetería, asumimos que está recibiendo y NO mostramos el modal de entrega ★★★
+      const isReceivingNew = guiaEl.value.trim().length > 0 || nombreDest.value.trim().length > 0 || paqueteriaInput.value.trim().length > 0;
+
+      if (!dom || isReceivingNew) { 
           confirmEntregarVariosModal.classList.add('hidden');
           currentBatchToDeliver = [];
           return;
@@ -542,18 +542,15 @@
       
       const paqs = await getAll('paquetes');
       
-      // ★★★ CAMBIO CRÍTICO: Usar comparación estricta (===) para el domicilio ★★★
       const paquetesParaEntregar = paqs.filter(p => 
         p.domicilio && 
-        p.domicilio.toLowerCase() === domLower && // <-- ¡CAMBIO AQUÍ! (Coincidencia Exacta)
+        p.domicilio.toLowerCase() === domLower && 
         p.estado === 'en_caseta'
       );
       
       if (paquetesParaEntregar.length > 0) {
         currentBatchToDeliver = paquetesParaEntregar;
-        
         domicilioVariosTxt.textContent = dom;
-        
         listaPaquetesVarios.innerHTML = '<ul>' + paquetesParaEntregar.map(p => {
             const fotoMiniatura = p.foto ? `<img src="${p.foto}" class="thumb-miniatura" data-paquete-id="${p.id}" data-type="foto" alt="foto paquete">` : '';
             return `<li style="display: flex; align-items: center; gap: 8px;">${fotoMiniatura}<div><strong>${p.guia}</strong> - ${p.nombre}<div class="info-paquete">${p.paqueteria || 'Sin paquetería'} | Recibido: ${formatDate(p.created)}</div></div></li>`;
@@ -561,14 +558,13 @@
         
         confirmEntregarVariosModal.classList.remove('hidden');
       } else {
-          // Si no hay coincidencias exactas y el modal está visible, lo ocultamos
           confirmEntregarVariosModal.classList.add('hidden');
           currentBatchToDeliver = [];
       }
     };
     const debouncedDomicilioSearch = () => {
       clearTimeout(domicilioDebounceTimer);
-      domicilioDebounceTimer = setTimeout(handleDomicilioInput, 500); // Reduje el debounce a 500ms
+      domicilioDebounceTimer = setTimeout(handleDomicilioInput, 500); 
     };
     domicilioInput.addEventListener('input', debouncedDomicilioSearch);
     domicilioInput.addEventListener('paste', debouncedDomicilioSearch);
@@ -589,12 +585,11 @@
       clearMessage();
       const guia = guiaEl.value.trim();
       const nombre = nombreDest.value.trim();
-      const domicilio = domicilioInput.value.trim(); // Obtener valor de domicilio
+      const domicilio = domicilioInput.value.trim(); 
       const comentarios = comentariosPaquete.value.trim(); 
       const fotoActual = fotoInput.files[0]; 
       const fotoExistente = fotoPreview.querySelector('img') ? fotoPreview.querySelector('img').src : null; 
       
-      // ★★★ CAMBIO: Validación de domicilio (obligatorio) ★★★
       if(!guia || !nombre || !domicilio){ showMessage('Guía, nombre y domicilio son obligatorios', 'error'); return; }
       
       if (!fotoActual && !fotoExistente) { showMessage('Es obligatorio tomar foto del paquete', 'error'); return; }
@@ -611,17 +606,25 @@
         
         // LÓGICA DE NOTIFICACIÓN (Solo si está marcado)
         if (notificarSi.checked) {
+          // ★★★ FIX: Buscar domicilio sin importar mayúsculas/minúsculas ★★★
           const dom = domicilioInput.value.trim(); let domInfo = null;
-          if (dom) { const doms = await getAll('domicilios'); domInfo = doms.find(d => d.calle === dom); }
+          if (dom) { 
+             const doms = await getAll('domicilios'); 
+             domInfo = doms.find(d => d.calle.toLowerCase() === dom.toLowerCase()); 
+          }
+          
           const nombreRes = nombreDest.value.trim() || `residente del ${dom}`;
           const paqInfo = `Paquete: ${paqueteriaInput.value || 'N/A'}\nGuía: ${guia}`;
           const domInfoMsg = `Domicilio: ${dom || 'No especificado'}`;
           const comentariosMsg = comentarios ? `\nComentarios: ${comentarios}` : '';
           const msg = `📦 *PAQUETE EN CASETA* 📦\nHola ${nombreRes}, se ha recibido 1 paquete para su domicilio.\n\n${domInfoMsg}\n${paqInfo}${comentariosMsg}\n\nRecibido por: ${user.nombre}.`;
 
-          const fotoFile = dataURLtoFile(fotoDataURL, `paquete_${guia}.png`);
+          // ★★★ FIX DE SHARE DUPLICADO: Agregar timestamp al nombre del archivo ★★★
+          // Android a veces bloquea compartir archivos con el mismo nombre consecutivamente.
+          const uniqueTime = Date.now();
+          const fotoFile = dataURLtoFile(fotoDataURL, `paquete_${guia}_${uniqueTime}.png`);
           const bannerDataURL = await createBannerImage('✅ Paquete en Caseta ✅');
-          const bannerFile = dataURLtoFile(bannerDataURL, 'notificacion.png');
+          const bannerFile = dataURLtoFile(bannerDataURL, `notificacion_${uniqueTime}.png`);
 
           const files = [];
           if (bannerFile) { files.push(bannerFile); }
@@ -643,50 +646,59 @@
             }
           }
 
+          let shareSuccess = false;
+
           if (canShareFiles) {
             try { 
-              // *** ÚNICA LLAMADA A navigator.share() ***
               await navigator.share(shareDataWithFiles); 
+              shareSuccess = true;
               notified = true; 
             } 
             catch (err) {
-              console.warn("Web Share API (con 2 archivos) falló:", err); 
-              notified = false; 
-              if (err.name !== 'AbortError') { 
-                if (domInfo && domInfo.telefono) { 
-                  const url = `https://wa.me/${domInfo.telefono}?text=${encodeURIComponent(msg)}`; 
-                  window.open(url, '_blank'); 
-                  notified = true; 
-                } 
-              }
+              console.warn("Web Share API (archivos) falló:", err); 
+              shareSuccess = false;
             }
           } 
-          else if (navigator.canShare && navigator.canShare(shareDataTextOnly)) {
-             console.warn("No se pueden compartir archivos, compartiendo solo texto.");
+          
+          // Fallback 1: Texto puro (si fallaron archivos o no son soportados)
+          if (!shareSuccess && navigator.canShare && navigator.canShare(shareDataTextOnly)) {
              try {
-                // *** ÚNICA LLAMADA A navigator.share() (Texto) ***
                 await navigator.share(shareDataTextOnly);
+                shareSuccess = true;
                 notified = true;
              } catch(err) {
-                if (err.name !== 'AbortError' && domInfo && domInfo.telefono) {
-                    const url = `https://wa.me/${domInfo.telefono}?text=${encodeURIComponent(msg)}`; 
-                    window.open(url, '_blank'); 
-                    notified = true;
-                }
+                console.warn("Web Share API (texto) falló:", err);
+                shareSuccess = false;
              }
           }
-          else if (domInfo && domInfo.telefono) { 
-            console.log("Web Share API no soportada, usando fallback de WA."); 
-            const url = `https://wa.me/${domInfo.telefono}?text=${encodeURIComponent(msg)}`; 
-            window.open(url, '_blank'); 
-            notified = true; 
+
+          // Fallback 2: WhatsApp Link (si todo lo anterior falló o si el usuario canceló share pero quiere enviar por WA)
+          if (!shareSuccess) {
+             if (domInfo && domInfo.telefono) { 
+               console.log("Usando fallback de WA."); 
+               const url = `https://wa.me/${domInfo.telefono}?text=${encodeURIComponent(msg)}`; 
+               window.open(url, '_blank'); 
+               notified = true; 
+             } else {
+                // Si no hay teléfono, avisar que no se pudo notificar
+                showMessage('Paquete guardado, pero NO se pudo notificar (No hay teléfono registrado o Share falló).', 'info', 5000);
+                // Marcamos notified true para evitar que el mensaje de abajo sobrescriba este aviso específico
+                notified = true; 
+             }
           }
         } 
         
         if(notified) { showMessage(p ? 'Paquete actualizado (Abriendo app...)' : 'Paquete registrado (Abriendo app...)', 'success', 4000); } 
+        else if (!notified && notificarSi.checked) { /* Ya mostramos mensaje de error arriba */ }
         else { showMessage(p ? 'Paquete actualizado' : 'Paquete registrado', 'success'); }
+        
         guiaEl.value=''; nombreDest.value=''; paqueteriaInput.value=''; domicilioInput.value=''; fotoInput.value='';
         comentariosPaquete.value = ''; fotoPreview.innerHTML = ''; notificarSi.checked = true;
+        
+        // Limpiar batch para evitar problemas
+        currentBatchToDeliver = [];
+        confirmEntregarVariosModal.classList.add('hidden');
+
         await refreshPaquetes(); await rebuildAutocomplete();
       }catch(err){ const errorMsg = (err.name === 'ConstraintError' || (err.message && err.message.includes('key'))) ? 'Error: Guía duplicada.' : 'Error al guardar.'; showMessage(errorMsg, 'error'); console.error(err); }
     }
@@ -730,7 +742,7 @@
       const firmaDataURL = firmaCanvas.toDataURL('image/png');
       const idFotoDataURL = idFotoFile ? await compressImage(idFotoFile) : idFotoPreviewSrc;
       const entregadoPor = user.nombre; const entregadoEn = Date.now();
-      let notified = false; let domInfo = null; let msg = ""; let shareTitle = ""; let comentarios = "";
+      let notified = false; let domInfo = null; let msg = ""; let comentarios = "";
       if (currentBatchToDeliver.length > 0) {
         const dom = currentBatchToDeliver[0].domicilio; comentarios = currentBatchToDeliver[0].comentarios || ""; 
         try {
@@ -739,10 +751,12 @@
             await putItem('paquetes', p);
             await addItem('historial',{paqueteId:p.id,estado:'entregado',usuario:entregadoPor,fecha:entregadoEn,nota:'Entrega en lote'});
           }
-          if (dom) { const doms = await getAll('domicilios'); domInfo = doms.find(d => d.calle === dom); }
+          if (dom) { 
+             const doms = await getAll('domicilios'); 
+             domInfo = doms.find(d => d.calle.toLowerCase() === dom.toLowerCase()); 
+          }
           const comentariosMsg = comentarios ? `\nComentarios: ${comentarios}` : '';
           msg = `✅ *PAQUETES ENTREGADOS* ✅\nHola residente del ${dom}, se han entregado ${currentBatchToDeliver.length} paquetes en su domicilio.${comentariosMsg}\n\nEntregado por: ${user.nombre}.`;
-          shareTitle = "Paquetes Entregados"; // Esta variable ya no se usa para 'share', pero se mantiene por si acaso
         } catch (err) { showMessage('Error al guardar entrega múltiple', 'error'); console.error(err); return; }
         currentBatchToDeliver = []; 
       } else {
@@ -755,19 +769,23 @@
           await putItem('paquetes', p);
           await addItem('historial',{paqueteId:p.id,estado:'entregado',usuario:entregadoPor,fecha:entregadoEn,nota:''});
           comentarios = p.comentarios || ""; const dom = p.domicilio;
-          if (dom) { const doms = await getAll('domicilios'); domInfo = doms.find(d => d.calle === dom); }
+          if (dom) { 
+             const doms = await getAll('domicilios'); 
+             domInfo = doms.find(d => d.calle.toLowerCase() === dom.toLowerCase()); 
+          }
           const comentariosMsg = comentarios ? `\nComentarios: ${comentarios}` : '';
           msg = `✅ *PAQUETE ENTREGADO* ✅\nHola ${p.nombre}, se ha entregado su paquete (Guía: ${p.guia}).${comentariosMsg}\n\nEntregado por: ${user.nombre}.`;
-          shareTitle = "Paquete Entregado"; // Esta variable ya no se usa para 'share'
         } catch (err) { showMessage('Error al guardar la entrega', 'error'); console.error(err); return; }
       }
       if (notificarEntregaSi.checked) {
-        const firmaFile = dataURLtoFile(firmaDataURL, `firma_entrega.png`); const idFile = dataURLtoFile(idFotoDataURL, `id_entrega.png`);
+        const uniqueTime = Date.now();
+        const firmaFile = dataURLtoFile(firmaDataURL, `firma_entrega_${uniqueTime}.png`); 
+        const idFile = dataURLtoFile(idFotoDataURL, `id_entrega_${uniqueTime}.png`);
         const files = [];
         if (firmaFile) files.push(firmaFile); 
         if (idFile) files.push(idFile);
         
-        // ★★★ La lógica de notificación de ENTREGA se mantiene intacta ★★★
+        // ★★★ La lógica de notificación de ENTREGA también recibe el FIX de share duplicado ★★★
         const shareDataWithFiles = { text: msg, files: files };
         const shareDataTextOnly = { text: msg };
 
@@ -784,41 +802,37 @@
             }
         }
         
+        let shareSuccess = false;
+
         if (canShareFiles) {
           try { 
             await navigator.share(shareDataWithFiles); 
+            shareSuccess = true;
             notified = true; 
           } 
           catch (err) {
-            console.warn("Web Share API (con 2 archivos) falló:", err);
-            notified = false;
-            if (err.name !== 'AbortError') { 
-              if (domInfo && domInfo.telefono) { 
-                const url = `https://wa.me/${domInfo.telefono}?text=${encodeURIComponent(msg)}`; 
-                window.open(url, '_blank'); 
-                notified = true; 
-              } 
-            }
+            console.warn("Web Share API (archivos entrega) falló:", err);
+            shareSuccess = false;
           }
         }
-        else if (navigator.canShare && navigator.canShare(shareDataTextOnly)) {
-           console.warn("No se pueden compartir archivos (entrega), compartiendo solo texto.");
+        
+        if (!shareSuccess && navigator.canShare && navigator.canShare(shareDataTextOnly)) {
            try {
               await navigator.share(shareDataTextOnly);
+              shareSuccess = true;
               notified = true;
            } catch(err) {
-              if (err.name !== 'AbortError' && domInfo && domInfo.telefono) {
-                  const url = `https://wa.me/${domInfo.telefono}?text=${encodeURIComponent(msg)}`; 
-                  window.open(url, '_blank'); 
-                  notified = true;
-              }
+              console.warn("Web Share API (texto entrega) falló:", err);
+              shareSuccess = false;
            }
         }
-        else if (domInfo && domInfo.telefono) { 
-          console.log("Web Share API no soportada (entrega), usando fallback de WA."); 
-          const url = `https://wa.me/${domInfo.telefono}?text=${encodeURIComponent(msg)}`; 
-          window.open(url, '_blank'); 
-          notified = true; 
+        
+        if (!shareSuccess) {
+          if (domInfo && domInfo.telefono) { 
+             const url = `https://wa.me/${domInfo.telefono}?text=${encodeURIComponent(msg)}`; 
+             window.open(url, '_blank'); 
+             notified = true; 
+          }
         }
       } 
       if (notified) { showMessage('Entrega guardada. (Abriendo app...)', 'success', 4000); } 
@@ -1067,7 +1081,7 @@
       if (users.length === 0) { tablaUsuarios.innerHTML = '<p class="muted">No hay usuarios registrados.</p>'; return; }
       users.forEach(u => {
         const row = document.createElement('div'); row.className = 'row';
-        row.innerHTML = `<div class="info" style="display: flex; align-items: center; gap: 10px;"><img src="${u.foto || 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxZW0iIGhlaWdodD0iMWVtIiB2aWV3Qm94PSIwIDAgMjQgMjUiPjxwYXRoIGZpbGw9ImN1cnJlbnRDb2xvciIgZD0iTTIyIDlpLTJ2MGE1IDUgMCAwIDAtNy4xNi00LjcyTDEyIDEwLjA5TDExLjE2IDQuMjdBNCA0IDAgMCAwIDggNUg1YTMgMyAwIDAgMC0zIDN2MWEzIDMgMCAwIDAgMyAzSDh2N0g2djJoMTJ2LTJoLTJ2LTd6TTkgN2EyIDIgMCAwIDEgMiAyaC43Nkw5LjM4IDdoLjI5em0yIDVWNC4wN2E0IDQgMCAwIDEgMS4zOCAxbDIuMjQgNy45M0gxMWExIDEgMCAwIDAtMS0xVjdoMVoiLz48L3N2Zz4='}" class="guardia-thumb"><div><strong>${u.nombre}</strong><div class="muted">Usuario: ${u.usuario} | Rol: ${u.rol || 'guardia'}</div></div></div><div>${u.id === user.id ? '<span class="muted">(Tú)</span>' : `<button class="btn danger-ghost" data-id="${u.id}" data-act="delete_user">Eliminar</button>`}</div>`;
+        row.innerHTML = `<div class="info" style="display: flex; align-items: center; gap: 10px;"><img src="${u.foto || 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxZW0iIGhlaWdodD0iMWVtIiB2aWV3Qm94PSIwIDAgMjQgMjUiPjxwYXRoIGZpbGw9ImN1cnJlbnRDb2xvciIgZD0iTTIyIDlpLTJ2MGE1IDUgMCAwIDAtNy4xNi00LjcyTDEyIDEwLjA5TDExLjE2IDQuMjdBNCA0IDAgMCAwIDggNUg1YTMgMyAwIDAgMC0zIDN2MWEzIDMgMCAwIDAgMyAzSDh2N0g2djJoMTJ2LTJoLTJ2LTd6TTkgN2EyIDIgMCAwIDIDEgMiAyaC43Nkw5LjM4IDdoLjI5em0yIDVWNC4wN2E0IDQgMCAwIDEgMS4zOCAxbDIuMjQgNy45M0gxMWExIDEgMCAwIDAtMS0xVjdoMVoiLz48L3N2Zz4='}" class="guardia-thumb"><div><strong>${u.nombre}</strong><div class="muted">Usuario: ${u.usuario} | Rol: ${u.rol || 'guardia'}</div></div></div><div>${u.id === user.id ? '<span class="muted">(Tú)</span>' : `<button class="btn danger-ghost" data-id="${u.id}" data-act="delete_user">Eliminar</button>`}</div>`;
         tablaUsuarios.appendChild(row);
       });
     }
@@ -1111,5 +1125,4 @@
     
   }
 })();
-
 
