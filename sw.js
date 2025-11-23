@@ -1,6 +1,6 @@
 // Nombre del caché (cámbialo SIEMPRE si actualizas los archivos principales)
-// ★★★ CAMBIO: v9 para purgar cualquier error persistente ★★★
-const CACHE_NAME = 'ctrl-paq-cache-v9';
+// ★★★ CAMBIO: v10 para corregir la regresión de búsqueda y diseño ★★★
+const CACHE_NAME = 'ctrl-paq-cache-v10';
 
 const urlsToCache = [
   '/',
@@ -20,8 +20,8 @@ const urlsToCache = [
 const externalUrls = [];
 
 self.addEventListener('install', event => {
-  console.log('[SW] Instalando v9...');
-  self.skipWaiting(); // Forzar activación inmediata
+  console.log('[SW] Instalando v10...');
+  self.skipWaiting(); // Forzar activación
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(urlsToCache.concat(externalUrls)))
@@ -30,7 +30,7 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('activate', event => {
-  console.log('[SW] Activado v9. Limpiando viejos...');
+  console.log('[SW] Activado v10. Limpiando...');
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
@@ -51,7 +51,6 @@ function staleWhileRevalidate(request) {
         }
         return response;
       }).catch(err => {
-        // Si falla red y no hay caché, error
         console.error('[SW] Fallo red:', err);
         throw err; 
       });
@@ -62,10 +61,7 @@ function staleWhileRevalidate(request) {
 
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
-  
-  // Estrategia especial para scripts críticos: Network First si es posible para asegurar versión nueva
-  // Pero mantenemos StaleWhileRevalidate para velocidad offline.
-  // Con v9 y el botón de reset, esto se arreglará.
+  // Usar StaleWhileRevalidate para todo lo local
   event.respondWith(staleWhileRevalidate(event.request));
 });
 
