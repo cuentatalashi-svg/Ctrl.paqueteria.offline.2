@@ -1,6 +1,6 @@
 // Nombre del caché (cámbialo SIEMPRE si actualizas los archivos principales)
-// ★★★ CAMBIO: Incremento la versión del caché a v5 y actualizo URLs a locales ★★★
-const CACHE_NAME = 'ctrl-paq-cache-v5';
+// ★★★ CAMBIO: Incremento la versión del caché a v6 para forzar la actualización de los bugs arreglados ★★★
+const CACHE_NAME = 'ctrl-paq-cache-v6';
 
 // "App Shell" - Archivos necesarios para que la app funcione offline
 const urlsToCache = [
@@ -14,25 +14,22 @@ const urlsToCache = [
   '/icon-192.svg',
   '/icon-512.svg',
   '/manifest.webmanifest',
-  // ★★★ AÑADIDO: Librerías PDF locales para asegurar la disponibilidad ★★★
+  // Librerías PDF locales
   '/jspdf.umd.js',
   '/jspdf.plugin.autotable.js',
 ];
 
 // URLs que siempre deben cargarse desde la red (Librerías externas)
-// ★★★ ELIMINADO: Se quitan las referencias CDN ya que se usa la versión local ★★★
 const externalUrls = [];
 
 // Evento "install": se dispara cuando el SW se instala
 self.addEventListener('install', event => {
-  console.log('[SW] Instalando...');
-  // GUARANTEE: Se espera a que TODOS los archivos esenciales (incluyendo el CDN) se guarden en caché.
-  // Esto es la base para el funcionamiento offline inicial.
+  console.log('[SW] Instalando v6...');
+  // GUARANTEE: Se espera a que TODOS los archivos esenciales se guarden en caché.
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
-        console.log('[SW] Abriendo caché y guardando app shell y librerías');
-        // Cachear archivos locales Y las librerías CDN (ahora urlsToCache incluye las locales)
+        console.log('[SW] Abriendo caché v6 y guardando app shell');
         return cache.addAll(urlsToCache.concat(externalUrls));
       })
       .then(() => self.skipWaiting()) // Forzar al SW a activarse
@@ -42,13 +39,13 @@ self.addEventListener('install', event => {
 
 // Evento "activate": se dispara cuando el SW se activa (limpia cachés viejos)
 self.addEventListener('activate', event => {
-  console.log('[SW] Activado.');
-  // GUARANTEE: Se borran cachés antiguos para ahorrar espacio.
+  console.log('[SW] Activado v6.');
+  // GUARANTEE: Se borran cachés antiguos para ahorrar espacio y asegurar que no se sirvan archivos viejos.
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
         cacheNames.filter(cacheName => {
-          // Borrar todos los cachés que no sean el actual
+          // Borrar todos los cachés que no sean el actual (v6)
           return cacheName.startsWith('ctrl-paq-cache-') && cacheName !== CACHE_NAME;
         }).map(cacheName => {
           console.log(`[SW] Borrando caché antiguo: ${cacheName}`);
@@ -65,7 +62,6 @@ function staleWhileRevalidate(request) {
   return caches.open(CACHE_NAME).then(cache => {
     return cache.match(request).then(cachedResponse => {
       // 1. Siempre devuelve la versión en caché inmediatamente si existe.
-      // ESTO ES LO QUE GARANTIZA EL OFFLINE.
       const networkFetch = fetch(request).then(response => {
         // Almacena la nueva versión en caché para la próxima vez
         if (response && response.status === 200 && request.method === 'GET') {
@@ -78,41 +74,17 @@ function staleWhileRevalidate(request) {
       });
 
       // 2. Si hay una respuesta en caché, la devuelve de inmediato.
-      // Si no hay caché, espera la respuesta de red (o falla si está offline).
+      // Si no hay caché, espera la respuesta de red.
       return cachedResponse || networkFetch;
     });
   });
 }
 
-// Estrategia: Cache First para librerías CDN (ya no se usa, pero se mantiene la función genérica)
-function cacheFirst(request) {
-    return caches.match(request).then(cachedResponse => {
-        // Devuelve la respuesta del caché inmediatamente si existe
-        if (cachedResponse) {
-            return cachedResponse;
-        }
-
-        // Si no está en caché, va a la red y guarda la copia
-        return fetch(request).then(networkResponse => {
-            if (networkResponse && networkResponse.status === 200 && request.method === 'GET') {
-                caches.open(CACHE_NAME).then(cache => {
-                    cache.put(request, networkResponse.clone());
-                });
-            }
-            return networkResponse;
-        }).catch(error => {
-            console.error('[SW] Fallo crítico al obtener CDN (offline):', error, request.url);
-            // Si falla la red, devuelve un error.
-            throw error;
-        });
-    });
-}
-
-
 // Evento "fetch": se dispara cada vez que la app pide un recurso
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
-  // ★★★ CAMBIO: Ahora todos los archivos de la app son locales, usamos siempre Stale While Revalidate ★★★
+  
+  // Verificar si es un archivo local de nuestra lista
   const isLocalFile = url.origin === location.origin && urlsToCache.some(u => url.pathname.endsWith(u.replace('/', '')));
   const isExternalLibrary = externalUrls.includes(event.request.url);
 
@@ -120,7 +92,7 @@ self.addEventListener('fetch', event => {
     return;
   }
   
-  // 1. Archivos de la aplicación (incluyendo los nuevos PDF locales) - Usar Stale While Revalidate
+  // 1. Archivos de la aplicación - Usar Stale While Revalidate
   if (isLocalFile || isExternalLibrary) {
     event.respondWith(staleWhileRevalidate(event.request));
     return;
@@ -132,5 +104,4 @@ self.addEventListener('fetch', event => {
       return caches.match(event.request); 
   }));
 });
-
 
